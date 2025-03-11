@@ -1,0 +1,45 @@
+# add_gaps.py
+# CS 6140: Final Project - Audio Inpainting
+# Written on 03/10/25
+#
+# This script loads a FLAC audio file and adds a gap to it
+
+# Import libraries
+import librosa
+import soundfile as sf
+import numpy as np
+
+def insert_gap(audio_path, output_path, gap_start, gap_duration, sample_rate=16000):
+    """
+    Insert a gap into a FLAC audio file
+    """
+    # Load audio
+    print(f"Loading audio...")
+    y, orig_sr = librosa.load(audio_path, sr=sample_rate)
+    
+    # Convert time to sample index
+    gap_start_idx = int(gap_start * sample_rate)
+    gap_length = int(gap_duration * sample_rate)
+    
+    # Create silent gap
+    silence = np.zeros(gap_length)
+    
+    # Split and insert silence
+    print("Adding gap...")
+    y_new = np.concatenate([y[:gap_start_idx], silence, y[gap_start_idx:]])
+    
+    # Save new audio file
+    print("Writing output file...")
+    sf.write(output_path, y_new, sample_rate)
+    
+    print(f"Processed file saved to {output_path}")
+
+# Example usage
+if __name__ == "__main__":
+    librispeech_path  = "/home/jacob/Documents/2025/Northeastern/CS_6140/Audio_Inpainting_Project/LibriSpeech/train-clean-100/LibriSpeech/train-clean-100/200/126784"
+    input_filepath    = f"{librispeech_path}/200-126784-0006.flac"
+    output_filepath   = f"200-126784-0006_SHORTENED.flac"
+    gap_start_time    = 2.0     # Time in seconds where the gap starts
+    gap_duration_time = 1.0     # Duration of the silence in seconds
+    
+    insert_gap(input_filepath, output_filepath, gap_start_time, gap_duration_time)

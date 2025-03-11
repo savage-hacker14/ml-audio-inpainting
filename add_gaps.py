@@ -26,7 +26,7 @@ def insert_gap(audio_path, output_path, gap_start, gap_duration, sample_rate=160
     
     # Split and insert silence
     print("Adding gap...")
-    y_new = np.concatenate([y[:gap_start_idx], silence, y[gap_start_idx:]])
+    y_new = np.concatenate([y[:gap_start_idx], silence, y[gap_start_idx + gap_length:]])
     
     # Save new audio file
     print("Writing output file...")
@@ -38,8 +38,8 @@ def insert_gap(audio_path, output_path, gap_start, gap_duration, sample_rate=160
 if __name__ == "__main__":
     librispeech_path  = "/home/jacob/Documents/2025/Northeastern/CS_6140/Audio_Inpainting_Project/LibriSpeech/train-clean-100/LibriSpeech/train-clean-100/200/126784"
     input_filepath    = f"{librispeech_path}/200-126784-0006.flac"
-    output_filepath   = f"200-126784-0006_SHORTENED.flac"
+    output_filepath   = f"200-126784-0006_W_GAP.flac"
     gap_start_time    = 2.0     # Time in seconds where the gap starts
-    gap_duration_time = 1.0     # Duration of the silence in seconds
+    gap_duration_time = 5.0     # Duration of the silence in seconds
     
     insert_gap(input_filepath, output_filepath, gap_start_time, gap_duration_time)

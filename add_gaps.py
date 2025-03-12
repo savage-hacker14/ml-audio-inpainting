@@ -9,13 +9,15 @@ import librosa
 import soundfile as sf
 import numpy as np
 
+from utils import load_audio
+
 def insert_gap(audio_path, output_path, gap_start, gap_duration, sample_rate=16000):
     """
     Insert a gap into a FLAC audio file
     """
     # Load audio
     print(f"Loading audio...")
-    y, orig_sr = librosa.load(audio_path, sr=sample_rate)
+    y, orig_sr = load_audio(audio_path, sample_rate)
     
     # Convert time to sample index
     gap_start_idx = int(gap_start * sample_rate)
@@ -36,7 +38,7 @@ def insert_gap(audio_path, output_path, gap_start, gap_duration, sample_rate=160
 
 # Example usage
 if __name__ == "__main__":
-    librispeech_path  = "/home/jacob/Documents/2025/Northeastern/CS_6140/Audio_Inpainting_Project/LibriSpeech/train-clean-100/LibriSpeech/train-clean-100/200/126784"
+    librispeech_path  = "/LibriSpeech/train-clean-100/200/126784"
     input_filepath    = f"{librispeech_path}/200-126784-0006.flac"
     output_filepath   = f"200-126784-0006_W_GAP.flac"
     gap_start_time    = 2.0     # Time in seconds where the gap starts

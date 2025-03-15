@@ -5,7 +5,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(os.path.dirname(os.path.abspath(__file__)))
 
 # Dataset paths
-LIBRISPEECH_ROOT = Path("/LibriSpeech/train-clean-100/LibriSpeech/train-clean-100")
+LIBRISPEECH_ROOT = Path("/home/jacob/Documents/2025/Northeastern/CS_6140/Audio_Inpainting_Project/LibriSpeech/train-clean-100/LibriSpeech/train-clean-100")
 SAMPLE_AUDIO_DIR = LIBRISPEECH_ROOT / "200/126784"
 SAMPLE_AUDIO_FILE = SAMPLE_AUDIO_DIR / "200-126784-0006.flac"
 

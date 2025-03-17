@@ -12,6 +12,7 @@ from config import DEFAULT_SAMPLE_RATE
 def load_audio(
     file_path: Union[str, Path],
     sample_rate: int = DEFAULT_SAMPLE_RATE,
+    max_len_s: int = 5,
     mono: bool = True
 ) -> Tuple[np.ndarray, int]:
     """
@@ -29,7 +30,46 @@ def load_audio(
         (audio_data, sample_rate)
     """
     audio_data, sr = librosa.load(file_path, sr=sample_rate, mono=mono)
+
+    # Clip audio to max_len_s
+    if (len(audio_data) > sample_rate * max_len_s):
+        audio_data = audio_data[:sample_rate * max_len_s]
+
     return audio_data, sr
+
+def add_random_gap(
+        file_path: Union[str, Path],
+        gap_len_s: int,
+        sample_rate: int = DEFAULT_SAMPLE_RATE,
+        mono: bool = True
+) -> Tuple[np.ndarray, int]:
+    """
+    Add a random gap of length gap_len_s at a random valid position within the audio file and return the audio data
+    
+    Parameters
+    ----------
+    file_path (str or Path): Path to the audio file
+    gap_len_s (int): Gap length [s] to add at one location within the audio file
+    sample_rate (int, optional): Target sample rate
+    mono (bool, optional): Whether to convert audio to mono
+
+    Returns
+    -------
+    tuple
+        (audio_data, sample_rate)
+    """
+    audio_data, sr = load_audio(file_path, sample_rate=sample_rate)
+    
+    # Get sample indices
+    audio_len     = len(audio_data)
+    gap_start_idx = np.random.randint(0, audio_len - int(gap_len_s * sample_rate))
+    gap_length    = int(gap_len_s * sample_rate)
+    silence       = np.zeros(gap_length)
+
+    # Add gap
+    audio_new = np.concatenate([audio_data[:gap_start_idx], silence, audio_data[gap_start_idx + gap_length:]])
+
+    return audio_new, sr
 
 def extract_spectrogram(
     audio_data: np.ndarray,

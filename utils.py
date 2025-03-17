@@ -4,6 +4,7 @@ import librosa
 import librosa.display
 import soundfile as sf
 import matplotlib.pyplot as plt
+from matplotlib import figure
 from pathlib import Path
 from typing import Tuple, Optional, Union
 
@@ -288,7 +289,7 @@ def visualize_spectrogram(
     x_axis: str = 'time',
     title: str = 'Spectrogram',
     save_path: Optional[Union[str, Path]] = None
-) -> None:
+) -> figure:
     """
     Visualize a spectrogram.
 
@@ -306,20 +307,21 @@ def visualize_spectrogram(
     -------
     None
     """
-    plt.figure(figsize=(10, 4))
-    librosa.display.specshow(
+    fig, ax = plt.subplots(figsize=(10, 4))
+    img = librosa.display.specshow(
         librosa.amplitude_to_db(spectrogram, ref=np.max),
         sr=sample_rate,
         hop_length=hop_length,
         y_axis=y_axis,
         x_axis=x_axis
-    )
-    plt.colorbar(format='%+2.0f dB')
-    plt.title(title)
-    plt.tight_layout()
+    )    
+    fig.colorbar(img, ax=ax, format='%+2.0f dB')
+    ax.set_title(title)
+    fig.tight_layout()
     
     if save_path is not None:
-        plt.savefig(save_path)
-        plt.close()
+        fig.savefig(save_path)
+        plt.close(fig)
     else:
-        plt.show()
+        #fig.show()
+        return fig

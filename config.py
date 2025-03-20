@@ -4,8 +4,18 @@ from pathlib import Path
 # Base project directory - adjust this to your project location
 PROJECT_ROOT = Path(os.path.dirname(os.path.abspath(__file__)))
 
+# Define user (for local paths to LibriSpeech data)
+USER = "Jacob"
+
 # Dataset paths
-LIBRISPEECH_ROOT = Path("/home/jacob/Documents/2025/Northeastern/CS_6140/Audio_Inpainting_Project/LibriSpeech/train-clean-100/LibriSpeech/train-clean-100")
+if (USER == "Jacob"):
+    LIBRISPEECH_ROOT = Path("C:\\Users\\Jacob\\Documents\\2024\\Northeastern\\CS_6140\\Project\\LibriSpeech\\train-clean-100")
+    LIBRISPEECH_ROOT_PROCESSED = Path("C:\\Users\\Jacob\\Documents\\2024\\Northeastern\\CS_6140\\Project\\LibriSpeech_PROCESSED\\train-clean-100")
+else:
+    LIBRISPEECH_ROOT = Path("/LibriSpeech/train-clean-100")
+    LIBRISPEECH_ROOT_PROCESSED = Path("/LibriSpeech_PROCESSED/train-clean-100")
+
+# Sample audio file paths
 SAMPLE_AUDIO_DIR = LIBRISPEECH_ROOT / "200/126784"
 SAMPLE_AUDIO_FILE = SAMPLE_AUDIO_DIR / "200-126784-0006.flac"
 

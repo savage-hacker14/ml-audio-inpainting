@@ -9,8 +9,8 @@ USER = "Jacob"
 
 # Dataset paths
 if (USER == "Jacob"):
-    LIBRISPEECH_ROOT = Path("/home/jacob/Documents/2025/Northeastern/CS_6140/Audio_Inpainting_Project/LibriSpeech/train-clean-100")
-    LIBRISPEECH_ROOT_PROCESSED = Path("/home/jacob/Documents/2025/Northeastern/CS_6140/Audio_Inpainting_Project/LibriSpeech_PROCESSED/train-clean-100")
+    LIBRISPEECH_ROOT = Path("C:\\Users\\Jacob\\Documents\\2024\\Northeastern\\CS_6140\\Project\\LibriSpeech\\train-clean-100")
+    LIBRISPEECH_ROOT_PROCESSED = Path("C:\\Users\\Jacob\\Documents\\2024\\Northeastern\\CS_6140\\Project\\LibriSpeech_PROCESSED\\train-clean-100")
 else:
     LIBRISPEECH_ROOT = Path("/LibriSpeech/train-clean-100")
     LIBRISPEECH_ROOT_PROCESSED = Path("/LibriSpeech_PROCESSED/train-clean-100")

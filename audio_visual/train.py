@@ -1,41 +1,63 @@
 # Imports
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import Dataset, DataLoader
+
 from tqdm import tqdm
 import configparser
-import torch
 
+import sys
+sys.path.append("..")
+from config import LIBRISPEECH_ROOT_PROCESSED
 
-if __name__ == "__main__":
-    # Load config file
-    config = configparser.ConfigParser()
-    config.read('blstm.config')
+from models import StackedBLSTMModel
+from dataloader import LibriSpeechDataset
 
-    
-    for epoch in range(n_epochs):  # loop over the dataset multiple times
-        running_loss_ffn = 0.0
+# Load config file
+import yaml
+with open('blstm.yaml', 'r') as f:
+    config = yaml.safe_load(f)
 
-        for data in tqdm(trainloader):
-            # get the inputs; data is a list of [inputs, labels]
-            inputs, labels = data
+# Create the model
+model = StackedBLSTMModel(config, dropout_rate=0.3, is_training=True)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model.to(device)
 
-            # Flatten inputs for ffn
-            labels_one_hot = torch.tensor(F.one_hot(labels, num_classes=10), dtype=torch.float32)
-            inputs_flattened =  torch.flatten(inputs, start_dim=1)
+# Create data loader
+dataset = LibriSpeechDataset(LIBRISPEECH_ROOT_PROCESSED)
+data_loader = DataLoader(dataset, batch_size=8, shuffle=True)
 
-            # zero the parameter gradients
-            optimizer_ffn.zero_grad()
+# Define loss function and optimizer
+criterion = nn.L1Loss()
+optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-            # forward + backward + optimize
-            outputs = feedforward_net(inputs_flattened)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer_ffn.step()
-            running_loss_ffn += loss.item()
+# Define number of train epochs
+num_epochs = 5
 
-        # Store training loss
-        ffn_loss[epoch] = running_loss_ffn
+for epoch in range(num_epochs):
+    model.train()
+    running_loss = 0.0
 
-        print(f"Training loss: {running_loss_ffn}")
+    for batch_idx, (inputs, targets, lengths) in enumerate(data_loader):
+        inputs = inputs.to(device)
+        targets = targets.to(device)
 
-    print('Finished Training')
+        optimizer.zero_grad()
 
-    torch.save(feedforward_net.state_dict(), 'ffn.pth')  # Saves model file (upload with submission)
+        outputs = model(inputs)
+
+        # Compute loss
+        loss = criterion(outputs, targets)
+
+        loss.backward()
+        optimizer.step()
+
+        running_loss += loss.item()
+
+        if (batch_idx + 1) % 10 == 0:
+            print(f"Epoch [{epoch+1}/{num_epochs}], Step [{batch_idx+1}], Loss: {loss.item():.4f}")
+
+    print(f"Epoch [{epoch+1}/{num_epochs}], Avg Loss: {running_loss / len(data_loader):.4f}")
+
+print("Training Complete!")

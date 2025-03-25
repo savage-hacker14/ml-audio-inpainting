@@ -42,8 +42,6 @@ for epoch in range(num_epochs):
 
     pbar = tqdm.tqdm(train_loader, desc=f"Epoch {epoch+1}/{num_epochs}")
     for batch_idx, (inputs, targets) in enumerate(pbar):
-        inputs, targets = next(iter(train_loader))
-
         inputs = inputs.to(device)
         targets = targets.to(device)
 

@@ -244,16 +244,21 @@ def mel_spectrogram_to_audio(
         fmax=fmax
     )
     
-    # Apply the pseudo-inverse of the mel filterbank
-    magnitude_spectrogram = np.dot(mel_basis.T, mel_spectrogram)
+    # Compute the pseudo-inverse of the mel filterbank
+    mel_filterbank_inv = np.linalg.pinv(mel_basis) 
+
+    # Convert Mel spectrogram to linear spectrogram
+    linear_spec = np.dot(mel_filterbank_inv, mel_spectrogram)
     
-    # If the input was a power spectrogram, take the square root
-    if power == 2.0:
-        magnitude_spectrogram = np.sqrt(magnitude_spectrogram)
+    # # If the input was a power spectrogram, take the square root
+    # if power == 2.0:
+    #     magnitude_spectrogram = np.sqrt(mel_spectrogram)
     
+    # linear_spec = librosa.feature.inverse.mel_to_stft(magnitude_spectrogram)
+
     # Perform Griffin-Lim to recover the phase and convert to audio
     audio_data = librosa.griffinlim(
-        magnitude_spectrogram,
+        linear_spec,
         hop_length=hop_length,
         n_fft=n_fft,
         n_iter=n_iter

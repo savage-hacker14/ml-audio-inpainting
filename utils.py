@@ -35,6 +35,9 @@ def load_audio(
     # Clip audio to max_len_s
     if (len(audio_data) > sample_rate * max_len_s):
         audio_data = audio_data[:sample_rate * max_len_s]
+    else:
+        # Add end padding of zeros if audio is less than max_len_s
+        audio_data = np.pad(audio_data, (0, sample_rate * max_len_s - len(audio_data)), 'constant')
 
     return audio_data, sr
 
@@ -70,7 +73,10 @@ def add_random_gap(
     # Add gap
     audio_new = np.concatenate([audio_data[:gap_start_idx], silence, audio_data[gap_start_idx + gap_length:]])
 
-    return audio_new, sr
+    # Return gap interval as a tuple
+    gap_interval = (round(gap_start_idx / sample_rate, 3), round((gap_start_idx + gap_length) / sample_rate, 3))
+
+    return audio_new, gap_interval
 
 def extract_spectrogram(
     audio_data: np.ndarray,

@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 
-from tqdm import tqdm
+import tqdm
 import configparser
 
 import sys
@@ -21,6 +21,7 @@ with open('blstm.yaml', 'r') as f:
 
 # Create the model
 model = StackedBLSTMModel(config, dropout_rate=0.3, is_training=True)
+print(model)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model.to(device)
 
@@ -30,34 +31,40 @@ data_loader = DataLoader(dataset, batch_size=8, shuffle=True)
 
 # Define loss function and optimizer
 criterion = nn.L1Loss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+optimizer = optim.Adam(model.parameters(), lr=0.0005)
 
 # Define number of train epochs
 num_epochs = 5
-
 for epoch in range(num_epochs):
     model.train()
     running_loss = 0.0
 
-    for batch_idx, (inputs, targets, lengths) in enumerate(data_loader):
+    pbar = tqdm.trange(len(data_loader), desc=f"Epoch {epoch+1}/{num_epochs}")
+    for batch_idx in pbar:
+        inputs, targets = next(iter(data_loader))
+
         inputs = inputs.to(device)
         targets = targets.to(device)
 
         optimizer.zero_grad()
 
+        # Forward pass
         outputs = model(inputs)
 
-        # Compute loss
+        # Compute L1 loss
         loss = criterion(outputs, targets)
 
+        # Backward pass & optimization
         loss.backward()
         optimizer.step()
 
         running_loss += loss.item()
 
-        if (batch_idx + 1) % 10 == 0:
-            print(f"Epoch [{epoch+1}/{num_epochs}], Step [{batch_idx+1}], Loss: {loss.item():.4f}")
+        # if (batch_idx + 1) % 10 == 0:
+        #     print(f"Epoch [{epoch+1}/{num_epochs}], Step [{batch_idx+1}], Loss: {loss.item():.4f}")
+        pbar.set_description(f"Epoch [{epoch+1}/{num_epochs}], Step [{batch_idx+1}], Loss: {loss.item():.4f}")
 
-    print(f"Epoch [{epoch+1}/{num_epochs}], Avg Loss: {running_loss / len(data_loader):.4f}")
+    avg_loss = running_loss / len(data_loader)
+    print(f"Epoch [{epoch+1}/{num_epochs}], Average Loss: {avg_loss:.4f}")
 
 print("Training Complete!")

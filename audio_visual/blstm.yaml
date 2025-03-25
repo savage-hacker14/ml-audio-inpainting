@@ -7,6 +7,8 @@ integration_layer: 1
 dropout_rate: 0.0
 max_n_epochs: 50
 n_earlystop_epochs: 5
+p_train: 0.8
+p_test: 0.2
 
 #### Optimizer config
 optimizer_type: adam

@@ -296,6 +296,7 @@ def visualize_spectrogram(
     spectrogram: np.ndarray,
     sample_rate: int = DEFAULT_SAMPLE_RATE,
     hop_length: int = 512,
+    gap_int: Optional[Tuple[int, int]] = None,
     y_axis: str = 'log',
     x_axis: str = 'time',
     title: str = 'Spectrogram',
@@ -309,6 +310,7 @@ def visualize_spectrogram(
     spectrogram (np.ndarray): Spectrogram to visualize
     sample_rate (int, optional): Sample rate of audio
     hop_length (int, optional): Number of samples between successive frames
+    gap_int (float tuple, optional): Start and end time [s] of the gap (if given) to be plotted as vertical lines
     y_axis (str, optional): Scale for the y-axis ('linear', 'log', or 'mel')
     x_axis (str, optional): Scale for the x-axis ('time' or 'frames')
     title (str, optional): Title for the plot
@@ -326,6 +328,13 @@ def visualize_spectrogram(
         y_axis=y_axis,
         x_axis=x_axis
     )    
+
+    # Compute gap start and end indices and plot vertical lines
+    if (gap_int is not None):
+        gap_start_s, gap_end_s = gap_int
+        ax.axvline(x=gap_start_s, color='red', linestyle='--', label='Gap Start')
+        ax.axvline(x=gap_end_s, color='red', linestyle='--', label='Gap End')
+
     fig.colorbar(img, ax=ax, format='%+2.0f dB')
     ax.set_title(title)
     fig.tight_layout()

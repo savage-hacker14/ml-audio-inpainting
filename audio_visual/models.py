@@ -43,5 +43,18 @@ class StackedBLSTMModel(nn.Module):
         logits = self.fc(rnn_outputs)
         return logits
     
+    def reconstruct_audio(self, corrupted_spectrogram, gap_mask):
+        """
+        Reconstruct the audio from the corrupted spectrogram using the model
+        and the gap mask (1 for gap, 0 for rest of audio)
+
+        TODO: Consider doing reconstructions using raw audio sample data instead of spectrograms,
+        perform iSTFT on the reconstructed gap spectrogram to get the full audio signal
+        """
+        reconstructed_full_spectrogram = self.forward(corrupted_spectrogram)
+        reconstructed_gap_spectrogram  = reconstructed_full_spectrogram * gap_mask + corrupted_spectrogram
+        
+        return reconstructed_gap_spectrogram
+    
 
     

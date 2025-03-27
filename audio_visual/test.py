@@ -36,28 +36,31 @@ N_FFT = config['n_fft']
 
 # Evaluate the model
 model.eval()
-for batch_idx, (spectrogram_gap, spectrogram_target) in enumerate(data_loader):
+for batch_idx, (spectrogram_gap, gap_int_s, gap_mask, spectrogram_target) in enumerate(data_loader):
     spectrogram_gap = spectrogram_gap.to(device)
+    gap_mask = gap_mask.to(device)
     spectrogram_target = spectrogram_target.to(device)
 
     # Forward pass
-    outputs = model(spectrogram_gap)
+    spectrogram_reconstructed = model.reconstruct_audio(spectrogram_gap, gap_mask)
 
     # Compute L1 loss
-    loss = criterion(outputs, spectrogram_target)
+    loss = criterion(spectrogram_reconstructed, spectrogram_target)
 
     print(f"Batch {batch_idx} - Loss: {loss.item()}")
 
     # Visualize the histograms
     spectrogram_target_sample = spectrogram_target[0].detach().cpu().numpy()
-    spectrogram_out_sample    = outputs[0].detach().cpu().numpy()
+    spectrogram_out_sample    = spectrogram_reconstructed[0].detach().cpu().numpy()
+    spectrogram_gap_sample    = spectrogram_gap[0].detach().cpu().numpy()
     fig1 = utils.visualize_spectrogram(spectrogram_target_sample, title="Original Audio Spectrogram")
-    fig2 = utils.visualize_spectrogram(spectrogram_out_sample, title="Reconstructed Audio Spectrogram")
+    fig2 = utils.visualize_spectrogram(spectrogram_gap_sample, gap_int=tuple(gap_int_s[0]), title="Spectrogram with Gap (Red)")
+    fig3 = utils.visualize_spectrogram(spectrogram_out_sample, gap_int=tuple(gap_int_s[0]), title="Reconstructed Audio Spectrogram")
     plt.show()
 
     # Save new audio file
-    utils.save_audio(utils.spectrogram_to_audio(spectrogram_out_sample, n_fft=2048), f"output/reconstructed_audio_{batch_idx}.flac")
+    utils.save_audio(utils.spectrogram_to_audio(spectrogram_out_sample, n_fft=N_FFT), f"output/reconstructed_audio_{batch_idx}.flac")
     #spectrogram_target_sample = spectrogram_target[0]
-    utils.save_audio(utils.spectrogram_to_audio(spectrogram_target_sample, n_fft=2048), f"output/true_audio_{batch_idx}.flac")
+    utils.save_audio(utils.spectrogram_to_audio(spectrogram_target_sample, n_fft=N_FFT), f"output/true_audio_{batch_idx}.flac")
 
     break  # Just load one batch for demo

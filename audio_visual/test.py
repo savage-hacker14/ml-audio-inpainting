@@ -23,8 +23,8 @@ with open('blstm.yaml', 'r') as f:
 
 # Load the model
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = StackedBLSTMModel(config, dropout_rate=0.3, is_training=True)
-model.load_state_dict(torch.load('checkpoints/blstm_epoch_5_2025_03_24.pt', weights_only=False))
+model = StackedBLSTMModel(config, dropout_rate=0.3, is_training=False)
+model.load_state_dict(torch.load('checkpoints/blstm_epoch_1_2025_03_26.pt', weights_only=False))
 print(model)
 model.to(device)
 
@@ -56,8 +56,8 @@ for batch_idx, (spectrogram_gap, spectrogram_target) in enumerate(data_loader):
     plt.show()
 
     # Save new audio file
-    utils.save_audio(utils.mel_spectrogram_to_audio(spectrogram_out_sample, n_fft=2048), f"output/reconstructed_audio_{batch_idx}.flac")
+    utils.save_audio(utils.spectrogram_to_audio(spectrogram_out_sample, n_fft=2048), f"output/reconstructed_audio_{batch_idx}.flac")
     #spectrogram_target_sample = spectrogram_target[0]
-    utils.save_audio(utils.mel_spectrogram_to_audio(spectrogram_target_sample, n_fft=2048), f"output/true_audio_{batch_idx}.flac")
+    utils.save_audio(utils.spectrogram_to_audio(spectrogram_target_sample, n_fft=2048), f"output/true_audio_{batch_idx}.flac")
 
     break  # Just load one batch for demo

@@ -28,9 +28,9 @@ class LibriSpeechDataset(Dataset):
         audio_data, sample_rate = utils.load_audio(file_path)
         audio_data_gap, gap_int = utils.add_random_gap(file_path, 0.2)
 
-        spectrogram_target = utils.extract_mel_spectrogram(audio_data, n_fft=2048, sample_rate=sample_rate) #torchaudio.load(file_path)
-        spectrogram_gap    = utils.extract_mel_spectrogram(audio_data_gap, n_fft=2048, sample_rate=sample_rate)
-        #print(f"Spectrogram size: {spectrogram.shape}, audio_data size: {audio_data.shape}")
+        spectrogram_target = utils.extract_spectrogram(audio_data, n_fft=2048) #torchaudio.load(file_path)
+        spectrogram_gap    = utils.extract_spectrogram(audio_data_gap, n_fft=2048)
+        #print(f"Spectrogram size: {spectrogram_gap.shape}, audio_data size: {audio_data.shape}")
         #print(f"Gap inserted at t = {gap_int[0]} s with length {gap_int[1] - gap_int[0]} s")
 
         return torch.tensor(spectrogram_gap, dtype=torch.float32), torch.tensor(spectrogram_target, dtype=torch.float32)

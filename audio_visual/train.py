@@ -65,6 +65,6 @@ for epoch in range(num_epochs):
 
     avg_loss = running_loss / len(train_loader)
     print(f"Epoch [{epoch+1}/{num_epochs}], Average Loss: {avg_loss:.4f}")
-    torch.save(model.state_dict(), f"checkpoints/blstm_epoch_{epoch+1}_2025_03_24.pt")
+    torch.save(model.state_dict(), f"checkpoints/blstm_epoch_{epoch+1}_2025_03_25.pt")
 
 print("Training Complete!")

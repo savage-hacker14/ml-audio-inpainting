@@ -15,3 +15,6 @@ optimizer_type: adam
 starter_learning_rate: 0.001
 lr_decay: 1.0
 l2: 0.0
+
+### Pre-Processing config
+n_fft: 2048

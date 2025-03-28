@@ -165,7 +165,7 @@ def spectrogram_to_audio(
     window: str = 'hann',
     win_length: Optional[int] = 384,
     n_fft: int = 512,
-    n_iter: int = 32,
+    n_iter: int = 64,       # 32 (previous value) was too low
     center: bool = True,
     phase_initialization: Optional[np.ndarray] = None
 ) -> np.ndarray:
@@ -203,6 +203,7 @@ def spectrogram_to_audio(
             center=center,
             init=phase_initialization
         )
+        # TODO: Consider switching to LWS (used in Audio-Visual paper)
     else:
         # Use iSTFT (since phase information is provided)
         audio_data = librosa.istft(

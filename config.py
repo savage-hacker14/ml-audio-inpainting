@@ -23,8 +23,12 @@ SAMPLE_AUDIO_FILE = SAMPLE_AUDIO_DIR / "200-126784-0006.flac"
 OUTPUT_DIR = PROJECT_ROOT / "output"
 os.makedirs(OUTPUT_DIR, exist_ok=True)  # Create output directory if it doesn't exist
 
-# Default parameters
-DEFAULT_SAMPLE_RATE = 16000
+# Default parameters for audio/visual model
+DEFAULT_SAMPLE_RATE = 16000  # 16 kHz
+DEFAULT_N_FFT = 512  # Number of FFT points
+DEFAULT_HANN_WINDOW_SIZE = 384 # 384 samples for 24 ms at 16 kHz
+DEFAULT_HANN_HOP_LENGTH = 192  # 12 ms
+
 DEFAULT_GAP_START_TIME = 2.0
 DEFAULT_GAP_DURATION = 0.5
 

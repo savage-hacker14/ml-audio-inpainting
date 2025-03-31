@@ -13,7 +13,7 @@ from config import DEFAULT_SAMPLE_RATE
 def load_audio(
     file_path: Union[str, Path],
     sample_rate: int = DEFAULT_SAMPLE_RATE,
-    max_len_s: int = 5,
+    max_len: int = 5,
     mono: bool = True
 ) -> Tuple[np.ndarray, int]:
     """
@@ -22,6 +22,7 @@ def load_audio(
     Parameters
     ----------
     file_path (str or Path): Path to the audio file
+    max_len (int): Maximum length of audio in seconds
     sample_rate (int, optional): Target sample rate
     mono (bool, optional): Whether to convert audio to mono
 
@@ -30,44 +31,59 @@ def load_audio(
     tuple
         (audio_data, sample_rate)
     """
-    audio_data, sr = librosa.load(file_path, sr=sample_rate, mono=mono)
-
-    # Clip audio to max_len_s
-    if (len(audio_data) > sample_rate * max_len_s):
-        audio_data = audio_data[:sample_rate * max_len_s]
-    else:
-        # Add end padding of zeros if audio is less than max_len_s
-        audio_data = np.pad(audio_data, (0, sample_rate * max_len_s - len(audio_data)), 'constant')
-
-    return audio_data, sr
+    try:
+        audio_data, sr = librosa.load(file_path, sample_rate=sample_rate, mono=mono)
+        
+        # Clip audio to max_len_s
+        max_samples = sample_rate * max_len
+        if len(audio_data) > max_samples:
+            audio_data = audio_data[:max_samples]
+        else:
+            # Add end padding of zeros if audio is less than max_len_s
+            audio_data = np.pad(
+                audio_data, 
+                (0, max_samples - len(audio_data)), 
+                'constant'
+            )
+            
+        return audio_data, sr
+    except Exception as e:
+        raise IOError(f"Error loading audio file {file_path}: {str(e)}")
 
 def add_random_gap(
         file_path: Union[str, Path],
-        gap_len_s: int,
+        gap_len: int,
         sample_rate: int = DEFAULT_SAMPLE_RATE,
         mono: bool = True
-) -> Tuple[np.ndarray, int]:
+) -> Tuple[np.ndarray, Tuple[float, float]]:
     """
-    Add a random gap of length gap_len_s at a random valid position within the audio file and return the audio data
+    Add a random gap of length gap_len at a random valid position within the audio file and return the audio data
     
     Parameters
     ----------
     file_path (str or Path): Path to the audio file
-    gap_len_s (int): Gap length [s] to add at one location within the audio file
+    gap_len (int): Gap length (seconds) to add at one location within the audio file
     sample_rate (int, optional): Target sample rate
     mono (bool, optional): Whether to convert audio to mono
 
     Returns
     -------
     tuple
-        (audio_data, gap_interval) [s]
+        (modified_audio_data, gap_interval)
+        gap_interval is a tuple of (start_time, end_time) in seconds
     """
-    audio_data, sr = load_audio(file_path, sample_rate=sample_rate)
+    audio_data, sr = load_audio(file_path, sample_rate=sample_rate, mono=mono)
     
-    # Get sample indices
+    # Convert gap length to samples
+    gap_length    = int(gap_len * sample_rate)
     audio_len     = len(audio_data)
-    gap_start_idx = np.random.randint(0, audio_len - int(gap_len_s * sample_rate))
-    gap_length    = int(gap_len_s * sample_rate)
+    
+    # Handle case where gap is longer than audio
+    if gap_length >= audio_len:
+        raise ValueError(f"Gap length ({gap_length}s) exceeds audio length ({audio_len/sample_rate}s)")
+    
+    # Get sample indices for gap placement
+    gap_start_idx = np.random.randint(0, audio_len - int(gap_len * sample_rate))
     silence       = np.zeros(gap_length)
 
     # Add gap
@@ -105,6 +121,9 @@ def extract_spectrogram(
     np.ndarray
         Magnitude spectrogram
     """
+    if power < 0:
+        raise ValueError("Power must be non-negative")
+    
     stft = librosa.stft(
         audio_data,
         n_fft=n_fft,
@@ -113,8 +132,10 @@ def extract_spectrogram(
         window=window,
         center=center
     )
-    return stft
-    #return np.abs(stft) ** power
+    
+    # return stft
+    # NOTE: There are no negative numnbers in the STFT, so we can use power = 1.0 for energy
+    return np.abs(stft) ** power
 
 
 def extract_mel_spectrogram(
@@ -146,6 +167,9 @@ def extract_mel_spectrogram(
     np.ndarray
         Mel spectrogram
     """
+    if power < 0:
+        raise ValueError("Power must be non-negative")
+    
     return librosa.feature.melspectrogram(
         y=audio_data,
         sr=sample_rate,
@@ -188,33 +212,31 @@ def spectrogram_to_audio(
     np.ndarray
         Audio time series
     """
-    # if spectrogram.min() >= 0:
-    #     spectrogram = np.sqrt(spectrogram)
+    # TODO: Consider switching to LWS (used in Audio-Visual paper)
+    # NOTE: Not possible to convert a magnitude spectrogram directly back to raw wav - phase and all voicing information is lost.
+    # NOTE: Griffin-Lim is not guaranteed to work well for all audio types. It is a heuristic method and may produce artifacts or distortions in some cases.
+    # NOTE: Griffin-Lim algorithm is used to recover the phase information and convert the magnitude spectrogram back to audio.
 
-    if (not phase_info):
-        # Use Griffin-Lim algorithm to recover phase
-        audio_data = librosa.griffinlim(
-            spectrogram,
-            hop_length=hop_length,
-            win_length=win_length,
-            n_fft=n_fft,
-            n_iter=n_iter,
-            window=window,
-            center=center,
-            init=phase_initialization
-        )
-        # TODO: Consider switching to LWS (used in Audio-Visual paper)
-    else:
-        # Use iSTFT (since phase information is provided)
-        audio_data = librosa.istft(
+    if phase_info:
+        return librosa.istft(
             spectrogram,
             hop_length=hop_length,
             win_length=win_length,
             window=window,
             center=center
         )
-
-    return audio_data
+    
+    # Use Griffin-Lim algorithm to recover phase
+    return librosa.griffinlim(
+        spectrogram,
+        hop_length=hop_length,
+        win_length=win_length,
+        n_fft=n_fft,
+        n_iter=n_iter,
+        window=window,
+        center=center,
+        init=phase_initialization
+    )
 
 
 def mel_spectrogram_to_audio(
@@ -234,14 +256,14 @@ def mel_spectrogram_to_audio(
     Parameters
     ----------
     mel_spectrogram (np.ndarray): Mel spectrogram
-    sample_rate (int, optional): Sample rate of audio
-    n_fft (int, optional): FFT window size
-    hop_length (int, optional): Number of samples between successive frames
-    n_iter (int, optional): Number of iterations for Griffin-Lim
-    n_mels (int, optional): Number of mel bands
-    fmin (float, optional): Minimum frequency
-    fmax (float or None, optional): Maximum frequency. If None, use sample_rate/2
-    power (float, optional): Exponent for the magnitude spectrogram (e.g. 1 for energy, 2 for power)
+    sample_rate     (int, optional): Sample rate of audio
+    n_fft           (int, optional): FFT window size
+    hop_length      (int, optional): Number of samples between successive frames
+    n_iter          (int, optional): Number of iterations for Griffin-Lim
+    n_mels          (int, optional): Number of mel bands
+    fmin            (float, optional): Minimum frequency
+    fmax            (float or None, optional): Maximum frequency. If None, use sample_rate/2
+    power           (float, optional): Exponent for the magnitude spectrogram (e.g. 1 for energy, 2 for power)
 
     Returns
     -------
@@ -264,12 +286,10 @@ def mel_spectrogram_to_audio(
     linear_spec = np.dot(mel_filterbank_inv, mel_spectrogram)
     
     # # If the input was a power spectrogram, take the square root
-    # if power == 2.0:
-    #     magnitude_spectrogram = np.sqrt(mel_spectrogram)
+    if power == 2.0:
+       linear_spec = np.sqrt(linear_spec)
     
-    # linear_spec = librosa.feature.inverse.mel_to_stft(magnitude_spectrogram)
-
-    # Perform Griffin-Lim to recover the phase and convert to audio
+    # Perform Griffin-Lim to estimate the phase and convert to audio
     audio_data = librosa.griffinlim(
         linear_spec,
         hop_length=hop_length,
@@ -284,25 +304,36 @@ def save_audio(
     audio_data: np.ndarray,
     file_path: Union[str, Path],
     sample_rate: int = DEFAULT_SAMPLE_RATE,
-    format: str = 'flac'
+    file_format: str = 'flac'
 ) -> None:
     """
     Save audio data to a file.
 
     Parameters
     ----------
-    audio_data (np.ndarray): Audio time series
-    file_path (str or Path): Path to save the audio file
-    sample_rate (int, optional): Sample rate of audio
-    format (str, optional): Audio file format
+    audio_data   (np.ndarray): Audio time series
+    file_path    (str or Path): Path to save the audio file
+    sample_rate  (int, optional): Sample rate of audio
+    file_format  (str, optional): Audio file format
     
     Returns
     -------
     None
     """
+    output_dir = os.path.dirname(file_path)
+    if output_dir and not os.path.exists(output_dir):
+        try:
+            os.makedirs(output_dir)
+        except Exception as e:
+            raise IOError(f"Error creating directory {output_dir}: {str(e)}")
+        
     # Normalize audio before saving
     audio_data = librosa.util.normalize(audio_data)
-    sf.write(file_path, audio_data, sample_rate, format=format)
+    
+    try:
+        sf.write(file_path, audio_data, sample_rate, format=file_format)
+    except Exception as e:
+        raise IOError(f"Error saving audio to {file_path}: {str(e)}")
 
 
 def visualize_spectrogram(
@@ -325,28 +356,33 @@ def visualize_spectrogram(
     Parameters
     ----------
     spectrogram (np.ndarray): Spectrogram to visualize
-    power (int): Whether the spectrogram is in energy (1) or power (2) scale
+    power       (int): Whether the spectrogram is in energy (1) or power (2) scale
     sample_rate (int, optional): Sample rate of audio
-    hop_length (int, optional): Number of samples between successive frames
-    gap_int (float tuple, optional): Start and end time [s] of the gap (if given) to be plotted as vertical lines
-    in_db (bool, optional): Whether the spectrogram is already in dB scale
-    y_axis (str, optional): Scale for the y-axis ('linear', 'log', or 'mel')
-    x_axis (str, optional): Scale for the x-axis ('time' or 'frames')
-    title (str, optional): Title for the plot
-    save_path (str or Path or None, optional): Path to save the visualization. If None, the plot is displayed.
+    hop_length  (int, optional): Number of samples between successive frames
+    gap_int     (float tuple, optional): Start and end time [s] of the gap (if given) to be plotted as vertical lines
+    in_db       (bool, optional): Whether the spectrogram is already in dB scale
+    y_axis      (str, optional): Scale for the y-axis ('linear', 'log', or 'mel')
+    x_axis      (str, optional): Scale for the x-axis ('time' or 'frames')
+    title       (str, optional): Title for the plot
+    save_path   (str or Path or None, optional): Path to save the visualization. If None, the plot is displayed.
     
     Returns
     -------
-    None
+    Figure or None
+        The matplotlib Figure object if save_path is None, otherwise None
     """
-    if (in_db):
-        spectrogram_data = np.array(spectrogram)
-    elif (not in_db and power == 1):
-        spectrogram_data = librosa.amplitude_to_db(spectrogram, ref=np.max)
-    elif (not in_db and power == 2):
-        spectrogram_data = librosa.power_to_db(spectrogram, ref=np.max)
-    else:
+    # Adjust for STFT time shifts due to hop_len?? - NOTE: Gaps MIGHT be slightly off as a result
+    if power not in (1, 2):
         raise ValueError("Power must be 1 (energy) or 2 (power)")
+    
+    # Convert to dB scale if needed
+    if in_db:
+        spectrogram_data = np.array(spectrogram)
+    elif power == 1:
+        spectrogram_data = librosa.amplitude_to_db(spectrogram, ref=np.max)
+    else:  # power == 2
+        spectrogram_data = librosa.power_to_db(spectrogram, ref=np.max)
+        
 
     fig, ax = plt.subplots(figsize=(10, 4))
     img = librosa.display.specshow(
@@ -356,30 +392,31 @@ def visualize_spectrogram(
         win_length=win_length,
         hop_length=hop_length,
         y_axis=y_axis,
-        x_axis=x_axis
+        x_axis=x_axis,
+        ax=ax
     )    
 
     # Compute gap start and end indices and plot vertical lines
-    if (gap_int is not None):
+    if gap_int is not None:
         gap_start_s, gap_end_s = gap_int
+        ax.axvline(x=gap_start_s, color='red', linestyle='--', label='Gap Start')
+        ax.axvline(x=gap_end_s, color='red', linestyle='--', label='Gap End')
+        ax.legend()
 
-        # Adjust for STFT time shifts due to hop_len?? - NOTE: Gaps MIGHT be slightly off as a result
-        # times = librosa.frames_to_time([gap_start_s, gap_end_s], sr=sample_rate, hop_length=hop_length)
-        # gap_start_s_true = times[0]
-        # gap_end_s_true   = times[1]
-        gap_start_s_true = gap_start_s
-        gap_end_s_true   = gap_end_s
-
-        ax.axvline(x=gap_start_s_true, color='red', linestyle='--', label='Gap Start')
-        ax.axvline(x=gap_end_s_true, color='red', linestyle='--', label='Gap End')
-
+    # Add colorbar and title
     fig.colorbar(img, ax=ax, format='%+2.0f dB')
     ax.set_title(title)
     fig.tight_layout()
-    
+
+    # Save or return the figure
     if save_path is not None:
+        # Create directory if it doesn't exist
+        output_dir = os.path.dirname(save_path)
+        if output_dir and not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+            
         fig.savefig(save_path)
         plt.close(fig)
-    else:
-        #fig.show()
-        return fig
+        return None
+    
+    return fig

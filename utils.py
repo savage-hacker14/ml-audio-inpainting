@@ -32,7 +32,7 @@ def load_audio(
         (audio_data, sample_rate)
     """
     try:
-        audio_data, sr = librosa.load(file_path, sample_rate=sample_rate, mono=mono)
+        audio_data, sr = librosa.load(file_path, sr=sample_rate, mono=mono)
         
         # Clip audio to max_len_s
         max_samples = sample_rate * max_len

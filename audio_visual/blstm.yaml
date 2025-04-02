@@ -1,7 +1,7 @@
 ## Model config
 audio_feat_dim: 417         # audio_len / hop_length
 audio_len: 80000
-batch_size: 8
+batch_size: 1
 net_dim: [417, 417, 417]    # They used 250 since audio_len was 3s, 48000 samples / 192 (ours is 5s, 80000)
 integration_layer: 1
 dropout_rate: 0.0
@@ -20,3 +20,5 @@ l2: 0.0
 n_fft: 512
 hann_win_length: 384
 hop_length: 192
+n_files: 100
+gaps_per_audio: 25

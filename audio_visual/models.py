@@ -11,6 +11,8 @@ import torch.nn.functional as F
 import math
 import librosa
 
+from config import DEFAULT_SAMPLE_RATE
+
 class StackedBLSTMModel(nn.Module):
     def __init__(self, config, dropout_rate, input_type='a', is_training=True, device="cpu"):
         super(StackedBLSTMModel, self).__init__()
@@ -79,6 +81,64 @@ class StackedBLSTMModel(nn.Module):
 
         return 10 ** reconstructed_gap_spectrogram          # log magnitude --> magnitude
     
+
+#################################################################################################
+
+class StackedBLSTMModelGapOnly(nn.Module):
+    def __init__(self, config, dropout_rate, input_type='a', is_training=True, device="cpu"):
+        super(StackedBLSTMModelGapOnly, self).__init__()
+        
+        self.audio_feat_dim = config['audio_feat_dim']
+        self.gap_feat_dim = int(self.audio_feat_dim * (0.2 / 5.0)) # Add these as params to config later
+        self.net_dim = config['net_dim']
+        self.num_layers = len(self.net_dim)
+        self.input_type = input_type
+        self.is_training = is_training
+        self.dropout_rate = dropout_rate
+        self.device = device
+        
+        # Bidirectional LSTM
+        self.blstm = nn.LSTM(
+            input_size=self.net_dim[0],
+            hidden_size=self.net_dim[1],
+            num_layers=self.num_layers,
+            batch_first=True,
+            bidirectional=True
+        )
+        
+        # Fully connected layer
+        self.fc = nn.Linear(self.net_dim[2] * 2, self.gap_feat_dim)
+
+    def forward(self, net_inputs):
+        lstm_outputs, _ = self.blstm(net_inputs)
+        
+        # Apply dropout
+        if self.is_training:
+            lstm_outputs = F.dropout(lstm_outputs, p=self.dropout_rate, training=True)
+        
+        # Fully connected layer
+        logits = self.fc(lstm_outputs)
+        return logits
+    
+    def reconstruct_audio(self, log_spectrogram_gap, gap_int_s):
+        """
+        Reconstruct the audio from the corrupted spectrogram using the model
+        and the gap mask (1 for gap, 0 for rest of audio)
+        """
+
+        # Reconstruct the gap
+        log_reconstructed_gap = self(log_spectrogram_gap)
+        
+        # Add the reconstructed gap bag into log_spectrogram_gap to get the full restored spectrogram
+        gap_start_idx = librosa.time_to_frames(gap_int_s.numpy()[:, 0], sr=DEFAULT_SAMPLE_RATE, hop_length=self.hop_len)
+        gap_end_idx   = librosa.time_to_frames(gap_int_s.numpy()[:, 1], sr=DEFAULT_SAMPLE_RATE, hop_length=self.hop_len)
+
+        # asdf
+        log_spectrogram_gap[:, gap_start_idx:gap_end_idx] = log_reconstructed_gap
+
+        return 10 ** log_spectrogram_gap          # log magnitude --> magnitude
+
+#################################################################################################
 
 class StackedNormBLSTMModel(nn.Module):
     def __init__(self, config, dropout_rate, input_type='a', is_training=True, device="cpu"):

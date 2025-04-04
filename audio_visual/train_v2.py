@@ -15,7 +15,7 @@ import sys
 sys.path.append("..")
 from config import LIBRISPEECH_ROOT
 
-from models import StackedBLSTMModel, StackedNormBLSTMModel
+from models import *
 from dataloader_simple import LibriSpeechDataset
 import librosa
 
@@ -26,8 +26,9 @@ with open('blstm.yaml', 'r') as f:
 
 # Create the model
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = StackedBLSTMModel(config, dropout_rate=0, device=device, is_training=True)
+#model = StackedBLSTMModel(config, dropout_rate=0, device=device, is_training=True)
 #model = StackedNormBLSTMModel(config, dropout_rate=0, device=device, is_training=True)
+model = StackedBLSTMModelGapOnly(config, dropout_rate=0, device=device, is_training=True)
 print(model)
 model.to(device)
 
@@ -93,6 +94,6 @@ for epoch in range(num_epochs):
     #     torch.save(model.state_dict(), f"checkpoints/blstm_simple_2025_04_01_epoch_{epoch+1}.pt")
 
     # Save model every epoch
-    torch.save(model.state_dict(), f"checkpoints/blstm_simple_2025_04_01_epoch_{epoch+1}.pt")
+    torch.save(model.state_dict(), f"checkpoints/blstm_gap_only_2025_04_04_epoch_{epoch+1}.pt")
 
 print("Training Complete!")

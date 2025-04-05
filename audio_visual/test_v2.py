@@ -18,7 +18,7 @@ from config import LIBRISPEECH_ROOT
 import utils
 import librosa
 
-from models import StackedBLSTMModel, StackedNormBLSTMModel
+from models import *
 from dataloader_simple import LibriSpeechDataset
 
 # Load config file
@@ -28,8 +28,9 @@ with open('blstm.yaml', 'r') as f:
 
 # Load the model
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = StackedBLSTMModel(config, dropout_rate=0, is_training=False)
-model.load_state_dict(torch.load('checkpoints/blstm_simple_2025_04_01_epoch_18.pt', weights_only=False))
+#model = StackedBLSTMModel(config, dropout_rate=0, is_training=False)
+model = StackedBLSTMCNN(1, 64, 3)
+model.load_state_dict(torch.load('checkpoints/blstm_cnn_no_gap_2025_04_05_epoch_50.pt', weights_only=False))
 print(model)
 model.to(device)
 
@@ -67,11 +68,20 @@ for batch_idx, (log_spectrogram_gaps, gap_ints_s, gap_masks, spectrogram_target_
 
     # Forward pass
     with torch.no_grad():
+        # Normalize log_spectrogram_gaps
+        #mu    = torch.mean(log_spectrogram_gaps)
+        #sigma = torch.std(log_spectrogram_gaps)         # mean: -1.9, std: 1.064
+        #log_spectrogram_gap_norm = (log_spectrogram_gaps - mu) / sigma
+
+        #spectrogram_reconstructed_norm = model.reconstruct_audio(log_spectrogram_gap_norm, gap_masks)
+        #spectrogram_reconstructed      = (spectrogram_reconstructed_norm * sigma) + mu
         spectrogram_reconstructed = model.reconstruct_audio(log_spectrogram_gaps, gap_masks)
-        spectrogram_full2 = model(log_spectrogram_gaps)
+        spectrogram_full2 = model(log_spectrogram_gaps.unsqueeze(1))
     #assert (spectrogram_full1 == spectrogram_full2).all()
 
     # Compute L1 loss
+    temp = spectrogram_reconstructed * gap_masks
+    print(f"min/max w gaps: {temp.min()}, {temp.max()}")
     loss = criterion(spectrogram_reconstructed * gap_masks, torch.abs(spectrogram_target_phases))
 
     print(f"Batch {batch_idx} - Loss: {loss.item()}")

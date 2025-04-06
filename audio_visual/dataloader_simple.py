@@ -36,6 +36,9 @@ class LibriSpeechDataset(Dataset):
                     self.file_paths.append(os.path.join(subdir, file))
                     counter += 1
 
+        # Ensure consistent order of file paths
+        self.file_paths.sort()
+
     def __len__(self):
         return len(self.file_paths)
 
@@ -51,7 +54,7 @@ class LibriSpeechDataset(Dataset):
         spectrogram_target_phase : torch.Tensor - True spectrogram (magnitude spectrogram with phase info, no gap)
         """
         file_path = self.file_paths[idx]
-        print(f"File path: {file_path}")
+        #print(f"File path: {file_path}")
 
         # Generate n_gaps_per_audio
         # TODO: Remove 5s audio hardcoded length
@@ -60,6 +63,9 @@ class LibriSpeechDataset(Dataset):
         gap_masks                  = torch.zeros((self.gaps_per_audio, self.n_fft // 2 + 1, math.ceil(DEFAULT_SAMPLE_RATE * 5 / self.hop_len)), dtype=torch.float32)
         gap_ints                   = torch.zeros((self.gaps_per_audio, 2), dtype=torch.float32)
         for i in range(self.gaps_per_audio):
+            # if (i == 0):
+            #     print(f"Load file path: {file_path}")
+
             # Load audio data (magnitude only)
             audio_data, sample_rate   = utils.load_audio(file_path)
 
@@ -69,11 +75,11 @@ class LibriSpeechDataset(Dataset):
             # Extract energy spectrogram (with phase info) for true audio (allows for better reconstruction later via iSTFT in test.py)
             # However, only extract log magnitude for the gap (this is what will be passed into the model)
             spectrogram_target_phase = utils.extract_spectrogram(audio_data, n_fft=self.n_fft, hop_length=self.hop_len, win_length=self.win_len)
-            spectrogram_gap          = np.abs(utils.extract_spectrogram(audio_data_gap, n_fft=self.n_fft, hop_length=self.hop_len, win_length=self.win_len))
+            spectrogram_gap          = np.abs(utils.extract_spectrogram(audio_data_gap, n_fft=self.n_fft, hop_length=self.hop_len, win_length=self.win_len))        # Model does NOT support complex numbers, so we only take the magnitude
 
             # NEW: Convert magnitude spectrograms to log magnitude spectrograms (suggested normalization in Audio-Visual paper)
             #spectrogram_target = librosa.power_to_db(spectrogram_target, ref=np.max)
-            spectrogram_gap          = np.log10(spectrogram_gap + 1e-9)           # Add small epsilon to avoid log(0)
+            spectrogram_gap          = np.log10(spectrogram_gap + 1e-9)           # Add small epsilon to avoid log(0) - CHECK how this works for complex numbers
 
             # Convert target and gap spectrograms to PyTorch tensors
             n_timeframes = spectrogram_target_phases.shape[2]

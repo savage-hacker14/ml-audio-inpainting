@@ -30,10 +30,10 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = StackedBLSTMModel(config, dropout_rate=0, device=device, is_training=True)
 #model = StackedNormBLSTMModel(config, dropout_rate=0, device=device, is_training=True)
 # model = UNet(1, 64)     # Add params later - Does NOT run, way too big model
-model = StackedBLSTMCNN(1, 64, 3)
+model = StackedBLSTMCNN(1, 128, 3)
 
 # Preload model weights if available
-model.load_state_dict(torch.load('checkpoints/blstm_cnn_no_gap_2025_04_05_BEST.pt', weights_only=False))
+#model.load_state_dict(torch.load('checkpoints/blstm_cnn_no_gap_2025_04_05_BEST.pt', weights_only=False))
 
 print(model)
 model.to(device)
@@ -47,8 +47,8 @@ dataset = LibriSpeechDataset(root_dir=LIBRISPEECH_ROOT,
                              n_fft=config['n_fft'], 
                              hop_len=config['hop_length'],
                              win_len=config['hann_win_length'])
-train_dataset, test_dataset = random_split(dataset, [config['p_train'], config['p_test']])
-train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True)
+#train_dataset, test_dataset = random_split(dataset, [config['p_train'], config['p_test']])
+train_loader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=False)
 
 # Define loss function and optimizer
 criterion = nn.L1Loss(reduction='sum')
@@ -81,11 +81,13 @@ for epoch in range(num_epochs):
 
         # Reconstruct the corrupated audio using the model
         #print(f"Spectrogram gap shape: {log_spectrogram_gaps.shape}")                    # Should be (batch_size, max_length, channels)
-        spectrograms_reconstructed = model.reconstruct_audio(log_spectrogram_gaps, gap_masks)
+        #spectrograms_reconstructed = model.reconstruct_audio(log_spectrogram_gaps, gap_masks)
+        log_spectrogram_reconstructed = model(log_spectrogram_gaps.unsqueeze(1))
 
         # Compute L1 loss
         # TODO: Switch to only compute loss on gap portion of the audio
-        loss = criterion(spectrograms_reconstructed, torch.abs(spectrogram_target_phases))        # Remove phase info from spectrogram_target_phase
+        #loss = criterion(spectrograms_reconstructed * gap_masks, torch.abs(spectrogram_target_phases * gap_masks))        # Remove phase info from spectrogram_target_phase
+        loss = criterion((10 ** log_spectrogram_reconstructed) * gap_masks, torch.abs(spectrogram_target_phases) * gap_masks)        # Remove phase info from spectrogram_target_phase
 
         # Backward pass & optimization
         loss.backward()
@@ -100,7 +102,7 @@ for epoch in range(num_epochs):
 
     # Save model every 5 epochs
     if (epoch % 5 == 0):
-        torch.save(model.state_dict(), f"checkpoints/blstm_cnn_no_gap_2025_04_05_epoch_{epoch+1}.pt")
+        torch.save(model.state_dict(), f"checkpoints/blstm_cnn_h128_2025_04_05_epoch_{epoch+1}.pt")
 
     # # Save model every epoch
     # torch.save(model.state_dict(), f"checkpoints/blstm_cnn_no_gap_2025_04_05_epoch_{epoch+1}.pt")

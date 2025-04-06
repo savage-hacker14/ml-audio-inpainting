@@ -29,8 +29,8 @@ with open('blstm.yaml', 'r') as f:
 # Load the model
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 #model = StackedBLSTMModel(config, dropout_rate=0, is_training=False)
-model = StackedBLSTMCNN(1, 64, 3)
-model.load_state_dict(torch.load('checkpoints/blstm_cnn_no_gap_2025_04_05_epoch_50.pt', weights_only=False))
+model = StackedBLSTMCNN(1, 128, 3)
+model.load_state_dict(torch.load('checkpoints/blstm_cnn_h128_2025_04_05_epoch_21.pt', weights_only=False))
 print(model)
 model.to(device)
 
@@ -88,11 +88,11 @@ for batch_idx, (log_spectrogram_gaps, gap_ints_s, gap_masks, spectrogram_target_
 
     # Visualize the histograms
     spectrogram_target_sample  = spectrogram_target_phases[0].detach().cpu().numpy()
-    #spectrogram_out_sample     = (spectrogram_reconstructed[0] * gap_mask[0]).detach().cpu().numpy()
+    # spectrogram_out_sample     = (spectrogram_reconstructed[0] * gap_mask[0]).detach().cpu().numpy()
     spectrogram_out_sample     = spectrogram_reconstructed[0].detach().cpu().numpy()
     spectrogram_gap_sample     = log_spectrogram_gaps[0].detach().cpu().numpy()
-    #spectrogram_full1_sample   = spectrogram_full1[0].detach().cpu().numpy()
-    #spectrogram_full2_sample   = (spectrogram_full2[0] * gap_mask[0]).detach().cpu().numpy()
+    # spectrogram_full1_sample   = spectrogram_full1[0].detach().cpu().numpy()
+    # spectrogram_full2_sample   = (spectrogram_full2[0] * gap_mask[0]).detach().cpu().numpy()
     spectrogram_full2_sample   = spectrogram_full2[0].detach().cpu().numpy()
 
     print(f"min/max spectrogram_target: {spectrogram_target_sample.min()}, {spectrogram_target_sample.max()}")
@@ -100,14 +100,14 @@ for batch_idx, (log_spectrogram_gaps, gap_ints_s, gap_masks, spectrogram_target_
     print(f"min/max spectrogram_reconstructed: {spectrogram_out_sample.min()}, {spectrogram_out_sample.max()}")
 
     # Save new audio file
-    utils.save_audio(utils.spectrogram_to_audio(spectrogram_out_sample, phase_info=False, n_fft=N_FFT), f"output/reconstructed_audio_{batch_idx}.flac")
+    utils.save_audio(utils.spectrogram_to_audio(10 ** spectrogram_out_sample, phase_info=False, n_fft=N_FFT), f"output/reconstructed_audio_{batch_idx}.flac")
     utils.save_audio(utils.spectrogram_to_audio(spectrogram_target_sample, phase_info=True, n_fft=N_FFT), f"output/true_audio_{batch_idx}.flac")
     utils.save_audio(utils.spectrogram_to_audio(10 ** spectrogram_gap_sample, phase_info=False, n_fft=N_FFT), f"output/gap_audio_{batch_idx}.flac")
 
     fig1 = utils.visualize_spectrogram(abs(spectrogram_target_sample), in_db=False, power=1, title="Original Audio Spectrogram")
     fig2 = utils.visualize_spectrogram(10 ** spectrogram_gap_sample, in_db=False, power=1, gap_int=tuple(gap_ints_s[0]), title="Spectrogram with Gap (Red)")
     fig3 = utils.visualize_spectrogram(10 ** spectrogram_full2_sample, in_db=False, power=1,gap_int=tuple(gap_ints_s[0]), title="Full Inferenced Spectrogram 2")
-    fig4 = utils.visualize_spectrogram(spectrogram_out_sample, gap_int=tuple(gap_ints_s[0]), in_db=False, power=1, title="Reconstructed Audio Spectrogram")
+    fig4 = utils.visualize_spectrogram(10 ** spectrogram_out_sample, gap_int=tuple(gap_ints_s[0]), in_db=False, power=1, title="Reconstructed Audio Spectrogram")
     plt.show()
 
     break  # Just load one batch for demo

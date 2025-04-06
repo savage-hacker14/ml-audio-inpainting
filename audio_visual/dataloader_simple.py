@@ -51,11 +51,12 @@ class LibriSpeechDataset(Dataset):
         spectrogram_target_phase : torch.Tensor - True spectrogram (magnitude spectrogram with phase info, no gap)
         """
         file_path = self.file_paths[idx]
+        print(f"File path: {file_path}")
 
         # Generate n_gaps_per_audio
         # TODO: Remove 5s audio hardcoded length
         spectrogram_gaps           = torch.zeros((self.gaps_per_audio, self.n_fft // 2 + 1, math.ceil(DEFAULT_SAMPLE_RATE * 5 / self.hop_len)), dtype=torch.float32)
-        spectrogram_target_phases  = torch.zeros((self.gaps_per_audio, self.n_fft // 2 + 1, math.ceil(DEFAULT_SAMPLE_RATE * 5 / self.hop_len)), dtype=torch.float32)
+        spectrogram_target_phases  = torch.zeros((self.gaps_per_audio, self.n_fft // 2 + 1, math.ceil(DEFAULT_SAMPLE_RATE * 5 / self.hop_len)), dtype=torch.cfloat)
         gap_masks                  = torch.zeros((self.gaps_per_audio, self.n_fft // 2 + 1, math.ceil(DEFAULT_SAMPLE_RATE * 5 / self.hop_len)), dtype=torch.float32)
         gap_ints                   = torch.zeros((self.gaps_per_audio, 2), dtype=torch.float32)
         for i in range(self.gaps_per_audio):
@@ -63,7 +64,7 @@ class LibriSpeechDataset(Dataset):
             audio_data, sample_rate   = utils.load_audio(file_path)
 
             # Obtain audio data with gap
-            audio_data_gap, gap_int_s = utils.add_random_gap(file_path, 0.2)
+            audio_data_gap, gap_int_s = utils.add_random_gap(file_path, 0.2)      # Normally 0.2, NO GAP inserted
 
             # Extract energy spectrogram (with phase info) for true audio (allows for better reconstruction later via iSTFT in test.py)
             # However, only extract log magnitude for the gap (this is what will be passed into the model)
@@ -72,14 +73,16 @@ class LibriSpeechDataset(Dataset):
 
             # NEW: Convert magnitude spectrograms to log magnitude spectrograms (suggested normalization in Audio-Visual paper)
             #spectrogram_target = librosa.power_to_db(spectrogram_target, ref=np.max)
-            spectrogram_gap          = np.log10(spectrogram_gap + 1e-6)           # Add small epsilon to avoid log(0)
+            spectrogram_gap          = np.log10(spectrogram_gap + 1e-9)           # Add small epsilon to avoid log(0)
 
             # Convert target and gap spectrograms to PyTorch tensors
-            spectrogram_target_phases[i] = torch.from_numpy(spectrogram_target_phase)
-            spectrogram_gaps[i]          = torch.tensor(spectrogram_gap, dtype=torch.float32)
+            n_timeframes = spectrogram_target_phases.shape[2]
+            spectrogram_target_phases[i] = torch.from_numpy(spectrogram_target_phase[:, :n_timeframes])      # Takes care of any off-by-1 errors due to rounding
+            spectrogram_gaps[i]          = torch.tensor(spectrogram_gap[:, :n_timeframes], dtype=torch.float32)
             gap_ints[i]                  = torch.tensor(gap_int_s, dtype=torch.float32)
 
             # Create gap mask
+            # gap_mask      = torch.ones_like(spectrogram_gaps[i], dtype=torch.float32)
             gap_mask      = torch.zeros_like(spectrogram_gaps[i], dtype=torch.float32)
             gap_start_idx = librosa.time_to_frames(gap_int_s[0], sr=sample_rate, hop_length=self.hop_len)
             gap_end_idx   = librosa.time_to_frames(gap_int_s[1], sr=sample_rate, hop_length=self.hop_len)
@@ -122,8 +125,24 @@ if __name__ == "__main__":
 
         # Visualize the histograms
         import matplotlib.pyplot as plt
-        fig1 = utils.visualize_spectrogram(np.abs(spectrogram_target_phase[0, 0]), in_db=False, power=1, title="Original Audio Spectrogram")
-        fig2 = utils.visualize_spectrogram(10 ** spectrogram_gap[0, 0], in_db=False, power=1, gap_int=tuple(gap_int_s[0, 0]), title="Gap Audio Spectrogram")
+        fig1 = utils.visualize_spectrogram(np.abs(spectrogram_target_phase[0, 0]), 
+                                           in_db=False, 
+                                           n_fft=config['n_fft'], 
+                                           win_length=config['hann_win_length'], 
+                                           hop_length=config['hop_length'], 
+                                           title="Original Audio Spectrogram")
+        fig2 = utils.visualize_spectrogram(10 ** spectrogram_gap[0, 0], 
+                                           in_db=False, gap_int=tuple(gap_int_s[0, 0]), 
+                                           n_fft=config['n_fft'], 
+                                           win_length=config['hann_win_length'], 
+                                           hop_length=config['hop_length'], 
+                                           title="Original Audio Spectrogram with Gap (White)")
+        fig3 = utils.visualize_spectrogram(spectrogram_target_phase[0, 0] * gap_mask[0, 0],
+                                           in_db=False, gap_int=tuple(gap_int_s[0, 0]), 
+                                           n_fft=config['n_fft'], 
+                                           win_length=config['hann_win_length'], 
+                                           hop_length=config['hop_length'], 
+                                           title="Gap Spectrogram")
 
         # Plot the gap mask as a heatmap
         plt.figure(figsize=(10, 4))
@@ -132,6 +151,14 @@ if __name__ == "__main__":
         plt.colorbar(label="Mask Value (0 or 1)")
         plt.xlabel("Sample Index")
         plt.ylabel("Frequency")
+
+        # Save a dummy audio file
+        spectrogram_target_phase_sample = (spectrogram_target_phase[0, 0]).detach().cpu().numpy()
+        utils.save_audio(utils.spectrogram_to_audio(spectrogram_target_phase_sample, 
+                                                    phase_info=True, n_fft=config['n_fft'], 
+                                                    win_length=config['hann_win_length'], 
+                                                    hop_length=config['hop_length']), 
+                                                    f"output/dataloader_true_audio_test_{batch_idx}.flac")
 
         plt.show()
         break  # Just load one batch for demo

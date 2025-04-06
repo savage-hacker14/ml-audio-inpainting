@@ -133,9 +133,9 @@ def extract_spectrogram(
         center=center
     )
     
-    # return stft
+    return stft
     # NOTE: There are no negative numnbers in the STFT, so we can use power = 1.0 for energy
-    return np.abs(stft) ** power
+    #return np.abs(stft) ** power
 
 
 def extract_mel_spectrogram(
@@ -379,9 +379,9 @@ def visualize_spectrogram(
     if in_db:
         spectrogram_data = np.array(spectrogram)
     elif power == 1:
-        spectrogram_data = librosa.amplitude_to_db(spectrogram, ref=np.max)
+        spectrogram_data = librosa.amplitude_to_db(spectrogram, ref=np.max, amin=1e-5, top_db=80)
     else:  # power == 2
-        spectrogram_data = librosa.power_to_db(spectrogram, ref=np.max)
+        spectrogram_data = librosa.power_to_db(spectrogram, ref=np.max, amin=1e-5, top_db=80)
         
 
     fig, ax = plt.subplots(figsize=(10, 4))
@@ -399,9 +399,9 @@ def visualize_spectrogram(
     # Compute gap start and end indices and plot vertical lines
     if gap_int is not None:
         gap_start_s, gap_end_s = gap_int
-        ax.axvline(x=gap_start_s, color='red', linestyle='--', label='Gap Start')
-        ax.axvline(x=gap_end_s, color='red', linestyle='--', label='Gap End')
-        ax.legend()
+        ax.axvline(x=gap_start_s, color='white', linestyle='--', label='Gap Start')
+        ax.axvline(x=gap_end_s, color='white', linestyle='--', label='Gap End')
+        #ax.legend()
 
     # Add colorbar and title
     fig.colorbar(img, ax=ax, format='%+2.0f dB')

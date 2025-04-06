@@ -30,7 +30,7 @@ with open('blstm.yaml', 'r') as f:
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 #model = StackedBLSTMModel(config, dropout_rate=0, is_training=False)
 model = StackedBLSTMCNN(1, 128, 3)
-model.load_state_dict(torch.load('checkpoints/blstm_cnn_h128_2025_04_05_epoch_21.pt', weights_only=False))
+model.load_state_dict(torch.load('checkpoints/blstm_cnn_h128_2025_04_06_epoch_41.pt', weights_only=False))
 print(model)
 model.to(device)
 
@@ -47,7 +47,9 @@ dataset = LibriSpeechDataset(root_dir=LIBRISPEECH_ROOT,
                              n_fft=config['n_fft'], 
                              hop_len=config['hop_length'],
                              win_len=config['hann_win_length'])
-data_loader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=True)
+#torch.manual_seed(123)        # To ensure same test/train split every time 
+train_dataset, test_dataset = random_split(dataset, [config['p_train'], config['p_test']])
+data_loader = DataLoader(test_dataset, batch_size=config['batch_size'], shuffle=True)
 criterion = nn.L1Loss()
 
 

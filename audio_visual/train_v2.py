@@ -33,7 +33,7 @@ model = StackedBLSTMModel(config, dropout_rate=0, device=device, is_training=Tru
 model = StackedBLSTMCNN(1, 128, 3)
 
 # Preload model weights if available
-#model.load_state_dict(torch.load('checkpoints/blstm_cnn_no_gap_2025_04_05_BEST.pt', weights_only=False))
+model.load_state_dict(torch.load('checkpoints/blstm_cnn_h128_2025_04_06_BEST.pt', weights_only=False))
 
 print(model)
 model.to(device)
@@ -47,8 +47,9 @@ dataset = LibriSpeechDataset(root_dir=LIBRISPEECH_ROOT,
                              n_fft=config['n_fft'], 
                              hop_len=config['hop_length'],
                              win_len=config['hann_win_length'])
-#train_dataset, test_dataset = random_split(dataset, [config['p_train'], config['p_test']])
-train_loader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=False)
+torch.manual_seed(123)        # To ensure same test/train split every time 
+train_dataset, test_dataset = random_split(dataset, [config['p_train'], config['p_test']])
+train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=False)
 
 # Define loss function and optimizer
 criterion = nn.L1Loss(reduction='sum')
@@ -102,7 +103,7 @@ for epoch in range(num_epochs):
 
     # Save model every 5 epochs
     if (epoch % 5 == 0):
-        torch.save(model.state_dict(), f"checkpoints/blstm_cnn_h128_2025_04_05_epoch_{epoch+1}.pt")
+        torch.save(model.state_dict(), f"checkpoints/blstm_cnn_h128_2025_04_06_epoch_{epoch+1}.pt")
 
     # # Save model every epoch
     # torch.save(model.state_dict(), f"checkpoints/blstm_cnn_no_gap_2025_04_05_epoch_{epoch+1}.pt")

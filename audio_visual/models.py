@@ -302,10 +302,10 @@ class StackedBLSTMCNN(nn.Module):
         )
 
         # Reduce frequency dimension (Global Pooling)
-        self.global_pool = nn.AdaptiveAvgPool2d((1, None))  # (batch, hidden_dim//2, 1, time)
+        #self.global_pool = nn.AdaptiveAvgPool2d((1, None))  # (batch, hidden_dim//2, 1, time)
 
         # LSTM Bottleneck
-        self.lstm = nn.LSTM(input_size=hidden_dim // 2, hidden_size=hidden_dim,
+        self.lstm = nn.LSTM(input_size=freq_bins * hidden_dim // 2, hidden_size=hidden_dim,
                             num_layers=num_layers, batch_first=True, bidirectional=True)
 
         # Projection Layer to Restore 2D Spectrogram
@@ -332,9 +332,13 @@ class StackedBLSTMCNN(nn.Module):
         x = self.encoder(x)  # (batch_size, hidden_dim//2, freq_bins, timeframes)
 
         # Reduce frequency dimension with global pooling
-        x = self.global_pool(x)  # (batch, hidden_dim//2, 1, time)
-        x = x.squeeze(2)  # (batch, hidden_dim//2, time)
-        x = x.permute(0, 2, 1)  # (batch, time, hidden_dim//2)
+        # x = self.global_pool(x)  # (batch, hidden_dim//2, 1, time)
+        # x = x.squeeze(2)  # (batch, hidden_dim//2, time)
+        # x = x.permute(0, 2, 1)  # (batch, time, hidden_dim//2)
+
+        # Convert CNN encoder output to LSTM input shape
+        x = x.permute(0, 3, 1, 2)  # (batch, time, channels, freq)
+        x = x.reshape(batch_size, timeframes, -1)  # (batch, time, channels * freq)
 
         # LSTM Bottleneck
         x, _ = self.lstm(x)  # (batch, time, hidden_dim * 2)

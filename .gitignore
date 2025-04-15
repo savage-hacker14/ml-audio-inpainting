@@ -1,0 +1,96 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyTorch specific
+*.pth
+*.pt
+*.ckpt
+*.safetensors
+
+# TensorBoard logs
+tensorboard/
+runs/
+logs/
+*.log
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+*.ipynb
+
+# Audio files (uncomment if you want to exclude audio files)
+# *.mp3
+# *.wav
+# *.flac
+# *.ogg
+
+# Generated samples
+samples/
+model/GAN/samples/
+
+# Checkpoints
+checkpoints/
+model/*/checkpoints/
+*.ckpt
+*.pt
+*.pth
+
+# Environment
+.env
+.venv
+venv/
+ENV/
+env/
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Large dataset files (LibriSpeech subset)
+# LibriSpeech/  # Uncomment if you don't want to track the dataset
+
+# Generated output directories
+output/
+model/*/output/
+
+# Logs
+*.log
+logs/
+model/*/logs/
+
+# Temporary files
+temp/
+tmp/
+
+*.flac
+*.txt
+

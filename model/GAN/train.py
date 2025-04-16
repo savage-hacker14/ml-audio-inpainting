@@ -1,4 +1,5 @@
 import random
+import re
 from typing import Optional
 from matplotlib import pyplot as plt
 import torch
@@ -14,7 +15,6 @@ import time
 import numpy as np
 from tqdm import tqdm
 import sys
-
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
@@ -96,6 +96,46 @@ def calculate_losses(cfg, generated_mag, original_mag, mask, d_fake_pred,
     }
     return losses
 
+def find_latest_checkpoint(checkpoint_dir: Path):
+    """Finds the latest checkpoint file in the given directory."""
+    latest_epoch = -1
+    latest_opt_path = None
+    opt_files = list(checkpoint_dir.glob("*.pth"))
+    
+    if not opt_files:
+        return None, None, None, -1
+    for f in opt_files:
+        match = re.search(r'optimizers_epoch_(\d+).pth', f.name)
+        if match:
+            epoch = int(match.group(1))
+            if epoch > latest_epoch:
+                latest_epoch = epoch
+                latest_opt_path = f
+
+    if latest_epoch == -1:
+        return None, None, None, -1 # No valid checkpoint files found
+
+    # Construct corresponding generator and discriminator paths
+    gen_path = checkpoint_dir / f"generator_epoch_{latest_epoch:04d}.pth"
+    disc_path = checkpoint_dir / f"discriminator_epoch_{latest_epoch:04d}.pth"
+
+    # Check if all three files exist
+    if gen_path.exists() and disc_path.exists() and latest_opt_path.exists():
+        return gen_path, disc_path, latest_opt_path, latest_epoch
+    else:
+        logging.warning(f"Incomplete checkpoint found for latest epoch {latest_epoch} in {checkpoint_dir}. Files expected: {gen_path.name}, {disc_path.name}, {latest_opt_path.name}.")
+        opt_files.sort(key=lambda x: int(re.search(r'optimizers_epoch_(\d+).pth', x.name).group(1)), reverse=True)
+        for opt_path_candidate in opt_files:
+             match = re.search(r'optimizers_epoch_(\d+).pth', opt_path_candidate.name)
+             if match:
+                  epoch_candidate = int(match.group(1))
+                  gen_path_candidate = checkpoint_dir / f"generator_epoch_{epoch_candidate:04d}.pth"
+                  disc_path_candidate = checkpoint_dir / f"discriminator_epoch_{epoch_candidate:04d}.pth"
+                  if gen_path_candidate.exists() and disc_path_candidate.exists():
+                       logging.warning(f"Found complete checkpoint for previous epoch {epoch_candidate}. Using this one.")
+                       return gen_path_candidate, disc_path_candidate, opt_path_candidate, epoch_candidate
+        logging.error(f"No complete checkpoint found in {checkpoint_dir}.")
+        return None, None, None, -1
 
 # --- Main Training Script ---
 if __name__ == "__main__":
@@ -108,6 +148,16 @@ if __name__ == "__main__":
 
     # --- Setup ---
     run_name = f"{log_cfg['run_name']}_vgg_{time.strftime('%Y%m%d_%H%M%S')}" # Add vgg marker
+
+    resume_from_checkpoint = train_cfg.get('resume_from_chkpt', False)
+    resume_run_name  = train_cfg.get('resume_run_name', None)
+    resume_epoch = train_cfg.get('resume_epoch', None)
+    chkpt_dir_to_resume = None
+
+    if resume_from_checkpoint:
+        chkpt_dir_to_resume = Path(paths_cfg['checkpoint_dir']) / resume_run_name
+        logging.info(f"Attempting to resume from specified run: {resume_run_name}")
+
 
     tb_dir = Path(paths_cfg['tensorboard_dir']) / run_name
     chkpt_dir = Path(paths_cfg['checkpoint_dir']) / run_name
@@ -126,7 +176,10 @@ if __name__ == "__main__":
                         format='%(asctime)s [%(levelname)s] %(message)s',
                         handlers=[logging.FileHandler(log_file), logging.StreamHandler()])
     logger = logging.getLogger()
-    logger.info(f"Starting run: {run_name}")
+    if resume_from_checkpoint:
+        logger.info(f"Resuming run: {run_name}")
+    else: 
+        logger.info(f"Starting run: {run_name}")
     logger.info(f"Config: \n{yaml.dump(cfg, indent=2)}") # Pretty print config
 
     # Tensorboard
@@ -199,6 +252,85 @@ if __name__ == "__main__":
     # --- Training Loop ---
     start_epoch = 0
     global_step = 0
+    if resume_from_checkpoint and chkpt_dir_to_resume is not None:
+        loaded_epoch = -1
+        chkpt_path_g = None
+        chkpt_path_d = None
+        chkpt_path_opt = None
+        
+        if not chkpt_dir_to_resume.exists():
+            logger.warning(f"Checkpoint directory {chkpt_dir_to_resume} not found. Starting training from scratch.")
+        else:
+            if resume_epoch is not None:
+                logger.info(f"Attempting to load specific checkpoint for epoch {resume_epoch} from {chkpt_dir_to_resume}")
+                # Construct expected paths for the specific epoch
+                specific_gen_path = chkpt_dir_to_resume / f"generator_epoch_{resume_epoch:04d}.pth"
+                specific_disc_path = chkpt_dir_to_resume / f"discriminator_epoch_{resume_epoch:04d}.pth"
+                specific_opt_path = chkpt_dir_to_resume / f"optimizers_epoch_{resume_epoch:04d}.pth"
+                if specific_gen_path.exists() and specific_disc_path.exists() and specific_opt_path.exists():
+                    chkpt_path_g = specific_gen_path
+                    chkpt_path_d = specific_disc_path
+                    chkpt_path_opt = specific_opt_path
+                    loaded_epoch = resume_epoch
+                    logger.info(f"Found complete checkpoint for specified epoch {resume_epoch}.")
+                else:
+                    logger.error(f"Could not find complete checkpoint files for specified epoch {resume_epoch} in {chkpt_dir_to_resume}. Expected:")
+                    logger.error(f" - {specific_gen_path.name}")
+                    logger.error(f" - {specific_disc_path.name}")
+                    logger.error(f" - {specific_opt_path.name}")
+                    logger.error("Starting training from scratch.")
+                    # Keep loaded_epoch = -1
+
+            # --- If no specific epoch requested, find the latest ---
+            else:
+                logger.info(f"Searching for latest checkpoint in: {chkpt_dir_to_resume}")
+                chkpt_path_g, chkpt_path_d, chkpt_path_opt, latest_epoch = find_latest_checkpoint(chkpt_dir_to_resume)
+                if latest_epoch != -1:
+                    loaded_epoch = latest_epoch # Use the found latest epoch number
+                    logger.info(f"Found latest complete checkpoint from epoch {latest_epoch}.")
+                else:
+                    logger.warning(f"No complete checkpoint found in {chkpt_dir_to_resume}. Starting training from scratch.")
+                    # Keep loaded_epoch = -1
+
+            # --- Load if a valid checkpoint (specific or latest) was identified ---
+            if loaded_epoch != -1 and chkpt_path_g and chkpt_path_d and chkpt_path_opt:
+                try:
+                    logger.info(f"Loading generator weights from: {chkpt_path_g}")
+                    generator.load_state_dict(torch.load(chkpt_path_g, map_location=device))
+
+                    logger.info(f"Loading discriminator weights from: {chkpt_path_d}")
+                    discriminator.load_state_dict(torch.load(chkpt_path_d, map_location=device))
+
+                    logger.info(f"Loading optimizer states from: {chkpt_path_opt}")
+                    checkpoint = torch.load(chkpt_path_opt, map_location=device)
+
+                    # Check if keys exist before loading (for backward compatibility maybe)
+                    if 'g_optimizer_state_dict' in checkpoint:
+                         g_optimizer.load_state_dict(checkpoint['g_optimizer_state_dict'])
+                    else:
+                         logger.warning("Generator optimizer state not found in checkpoint.")
+                    if 'd_optimizer_state_dict' in checkpoint:
+                         d_optimizer.load_state_dict(checkpoint['d_optimizer_state_dict'])
+                    else:
+                         logger.warning("Discriminator optimizer state not found in checkpoint.")
+
+                    # Load epoch and global step, handle potential missing keys
+                    start_epoch = checkpoint.get('epoch', -1) + 1 # Start from next epoch
+                    global_step = checkpoint.get('global_step', 0)
+                    if start_epoch == 0: # Check if epoch key was missing
+                         logger.warning("'epoch' key not found in optimizer checkpoint. Resetting start_epoch to 0.")
+                         start_epoch = 0 # Safety reset
+                    if global_step == 0 and start_epoch != 0:
+                         logger.warning("'global_step' key not found or was 0 in optimizer checkpoint. Resetting global_step to 0.")
+                         global_step = 0 # Safety reset, though might be inaccurate
+
+                    logger.info(f"Successfully resumed training from epoch {start_epoch}, global step {global_step}.")
+
+                except Exception as e:
+                    logger.error(f"Error loading checkpoint files for epoch {loaded_epoch}: {e}. Starting training from scratch.", exc_info=True)
+                    start_epoch = 0
+                    global_step = 0
+            
     logger.info("Starting training...")
 
     for epoch in range(start_epoch, train_cfg['epochs']):
@@ -224,23 +356,21 @@ if __name__ == "__main__":
 
             # --- Train Discriminator ---
             d_optimizer.zero_grad()
+            with torch.no_grad():
+                generated_mag = generator(impaired_mag, mask)
+
 
             # Real samples
             d_real_pred = discriminator(original_mag)
             target_real = torch.ones_like(d_real_pred, device=device)
             d_loss_real = bce_loss(d_real_pred, target_real)
-
-            # Fake samples
-            generated_mag = generator(impaired_mag, mask)
-
+            
             d_fake_pred = discriminator(generated_mag.detach())
             target_fake = torch.zeros_like(d_fake_pred, device=device)
             d_loss_fake = bce_loss(d_fake_pred, target_fake)
 
             d_loss = (d_loss_real + d_loss_fake) / 2
             d_loss.backward()
-            # Optional: Gradient clipping for D
-            # torch.nn.utils.clip_grad_norm_(discriminator.parameters(), max_norm=1.0)
             d_optimizer.step()
 
             # --- Train Generator ---
@@ -341,7 +471,7 @@ if __name__ == "__main__":
                     # --- Reconstruct and Save Audio Samples ---
                     # NOTE: We need to invert the normalization done by the dataset/generator
                     # Assuming log1p for original/impaired, Tanh for generated
-                    # And griffin_lim_recon expects linear magnitude
+                    # And expect linear magnitude
 
                     # Invert generator Tanh output: Needs correct scaling inversion if used
                     # For now, let's use the combined approach with original phase where possible

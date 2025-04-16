@@ -43,6 +43,9 @@ training:
   lambda_vgg_perceptual: 4.0  # Weight for Lp 
   lambda_vgg_style: 500.0     # Weight for Ls
   lambda_mag_weighted: 0.2    # Weight for Lw (Magnitude-weighted L1)
+  resume_from_chkpt: false    # Resume from checkpoint 
+  resume_run_name: null       # Name of the run to resume from 
+  resume_epoch: null          # Resume from a specific epoch 
 
 # Logging and Checkpointing
 paths:

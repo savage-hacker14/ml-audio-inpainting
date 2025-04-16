@@ -95,7 +95,6 @@ class PartialConv2d(nn.Module):
         if self.bias is not None:
             output = output + self.bias.view(1, self.out_channels, 1, 1)
 
-        # Ensure updated mask is binary (0 or 1) - Clamp might be better than >0
         # A pixel in the updated mask is valid if at least one pixel in its receptive field was valid
         updated_mask = torch.clamp(updated_mask, 0.0, 1.0)
         # Alternative: updated_mask = (updated_mask > 0).float()
@@ -103,7 +102,6 @@ class PartialConv2d(nn.Module):
         # If multi_channel=False, the updated mask will have 1 channel. Repeat it.
         if not self.multi_channel and updated_mask.shape[1]==1 and self.out_channels > 1:
             updated_mask = updated_mask.repeat(1, self.out_channels, 1, 1)
-
 
         return output, updated_mask
 

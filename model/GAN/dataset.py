@@ -32,7 +32,6 @@ class SpeechInpaintingDataset(Dataset):
         self.gap_len_s = self.data_cfg['gap_len_s']
         self.max_samples = int(self.sample_rate * self.max_len_s)
 
-
         # Determine dataset path
         if dataset_type == 'train':
             data_path_key = 'train_path'
@@ -49,7 +48,6 @@ class SpeechInpaintingDataset(Dataset):
         if not self.dataset_dir.exists():
              raise FileNotFoundError(f"Dataset directory not found: {self.dataset_dir}")
 
-        # Find all audio files (assuming .flac for LibriSpeech)
         self.file_paths = list(self.dataset_dir.rglob('*.flac'))
         if not self.file_paths:
              raise FileNotFoundError(f"No .flac files found in {self.dataset_dir}")

@@ -1,4 +1,3 @@
-# train.py
 import random
 from typing import Optional
 from matplotlib import pyplot as plt
@@ -61,9 +60,6 @@ def calculate_losses(cfg, generated_mag, original_mag, mask, d_fake_pred,
     num_hole = torch.sum(hole_mask) + 1e-8
     g_loss_l1_hole = l1_loss(hole_pixels, target_hole_pixels) / num_hole
 
-    # Magnitude-Weighted Loss (Lw) - Use mean reduction for simplicity
-    # Ensure original_mag is positive for weighting (using abs or clamping)
-    # Weighting by abs(original_mag) might be more stable than raw log1p output
     mag_weight = torch.abs(original_mag)
     g_loss_mag_weighted = torch.mean(torch.abs(generated_mag - original_mag) * mag_weight)
 
@@ -167,16 +163,15 @@ if __name__ == "__main__":
         input_channels=cfg['model']['generator']['input_channels'],
         mask_channels=cfg['model']['generator']['mask_channels'],
         output_channels=cfg['model']['generator']['output_channels'],
-        enc_layer_cfg=cfg['model']['generator'].get('enc_layer_cfg', [ # Provide default if missing
+        enc_layer_cfg=cfg['model']['generator'].get('enc_layer_cfg', [ 
              (64, 7, 2, 3), (128, 5, 2, 2), (256, 5, 2, 2),
              (512, 3, 2, 1), (512, 3, 2, 1), (512, 3, 2, 1), (512, 3, 2, 1)
          ]),
-         # Add other params from config if needed
     ).to(device)
 
     discriminator = Discriminator(
         input_channels=cfg['model']['discriminator']['input_channels'],
-         layer_cfg=cfg['model']['discriminator'].get('layer_cfg', [ # Provide default if missing
+         layer_cfg=cfg['model']['discriminator'].get('layer_cfg', [ 
              (64, 2, False), (128, 2, False), (256, 2, False), (512, 1, False)
          ]),
         use_spectral_norm=cfg['model']['discriminator']['use_spectral_norm']
@@ -251,8 +246,6 @@ if __name__ == "__main__":
             # --- Train Generator ---
             g_optimizer.zero_grad()
 
-            # We already have generated_mag from the D step, no need to regenerate
-            # unless D step somehow modified G's requires_grad status (unlikely here)
             d_fake_pred_g = discriminator(generated_mag) # Use non-detached output
 
             # Calculate generator losses (Adv, L1s, MagWeighted, VGG)
@@ -263,8 +256,6 @@ if __name__ == "__main__":
             g_loss = g_losses['g_total']
 
             g_loss.backward()
-             # Optional: Gradient clipping for G
-            # torch.nn.utils.clip_grad_norm_(generator.parameters(), max_norm=1.0)
             g_optimizer.step()
 
             # --- Logging ---
@@ -348,7 +339,7 @@ if __name__ == "__main__":
 
 
                     # --- Reconstruct and Save Audio Samples ---
-                    # We need to invert the normalization done by the dataset/generator
+                    # NOTE: We need to invert the normalization done by the dataset/generator
                     # Assuming log1p for original/impaired, Tanh for generated
                     # And griffin_lim_recon expects linear magnitude
 

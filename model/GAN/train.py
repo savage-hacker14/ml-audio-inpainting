@@ -322,9 +322,9 @@ if __name__ == "__main__":
                     vis_kwargs = {
                         'sample_rate': data_cfg['sample_rate'],
                         'hop_length': spec_cfg['hop_length'],
-                        'is_db': False, # Input mags are log1p or Tanh
-                        'y_axis': 'linear', # Freq axis
-                        'gap_coords_time': (gap_start_s, gap_end_s) if gap_end_frame > gap_start_frame else None
+                        'in_db': False, # Input mags are log1p or Tanh
+                        #'y_axis': 'linear', # Freq axis
+                        'gap_int': (gap_start_s, gap_end_s) if gap_end_frame > gap_start_frame else None
                     }
                     # Create figures (function returns figure object)
                     fig_orig = visualize_spectrogram(orig_mag_np, title="Original Mag", **vis_kwargs)
@@ -353,22 +353,22 @@ if __name__ == "__main__":
                     # For simplicity in saving, let's use orig phase + combined *log* mag for recon
                     combined_log_mag = generated_mag_np * (1 - mask_np) + orig_mag_np * mask_np
 
-                    # Reconstruct using original phase + combined log magnitude
-                    audio_recon_combined = spectrogram_to_audio(
-                         combined_log_mag, phase_np,
-                         hop_length=spec_cfg['hop_length'],
-                         win_length=spec_cfg['win_length'],
-                         window=spec_cfg['window'],
-                         normalize=True # Indicate input is log1p scaled
-                    )
-                    writer.add_audio("Audio/Generated_CombinedLogMag_OrigPhase", audio_recon_combined, global_step, sample_rate=data_cfg['sample_rate'])
-                    save_audio(audio_recon_combined, sample_dir / f"step_{global_step}_recon_comb_origphase.flac", data_cfg['sample_rate'])
+                    # # Reconstruct using original phase + combined log magnitude
+                    # audio_recon_combined = spectrogram_to_audio(
+                    #      combined_log_mag, phase_np,
+                    #      hop_length=spec_cfg['hop_length'],
+                    #      win_length=spec_cfg['win_length'],
+                    #      window=spec_cfg['window'],
+                    #      normalize=True # Indicate input is log1p scaled
+                    # )
+                    # writer.add_audio("Audio/Generated_CombinedLogMag_OrigPhase", audio_recon_combined, global_step, sample_rate=data_cfg['sample_rate'])
+                    # save_audio(audio_recon_combined, sample_dir / f"step_{global_step}_recon_comb_origphase.flac", data_cfg['sample_rate'])
 
-                    # Save original and impaired for reference
-                    audio_orig = spectrogram_to_audio(orig_mag_np, phase_np, hop_length=spec_cfg['hop_length'], win_length=spec_cfg['win_length'], window=spec_cfg['window'], normalize=True)
-                    audio_imp = spectrogram_to_audio(impaired_mag_np, phase_np, hop_length=spec_cfg['hop_length'], win_length=spec_cfg['win_length'], window=spec_cfg['window'], normalize=True)
-                    save_audio(audio_orig, sample_dir / f"step_{global_step}_original.flac", data_cfg['sample_rate'])
-                    save_audio(audio_imp, sample_dir / f"step_{global_step}_impaired.flac", data_cfg['sample_rate'])
+                    # # Save original and impaired for reference
+                    # audio_orig = spectrogram_to_audio(orig_mag_np, phase_np, hop_length=spec_cfg['hop_length'], win_length=spec_cfg['win_length'], window=spec_cfg['window'], normalize=True)
+                    # audio_imp = spectrogram_to_audio(impaired_mag_np, phase_np, hop_length=spec_cfg['hop_length'], win_length=spec_cfg['win_length'], window=spec_cfg['window'], normalize=True)
+                    # save_audio(audio_orig, sample_dir / f"step_{global_step}_original.flac", data_cfg['sample_rate'])
+                    # save_audio(audio_imp, sample_dir / f"step_{global_step}_impaired.flac", data_cfg['sample_rate'])
 
 
                 generator.train() # Set back to train mode

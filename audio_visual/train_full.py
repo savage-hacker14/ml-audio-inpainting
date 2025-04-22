@@ -117,32 +117,7 @@ for epoch in range(num_epochs):
         # Write train loss to tensorboard every `metric_interval` batches
         if (global_step % config['logging']['metric_interval'] == 0):
             writer.add_scalar('Train_Loss', loss.item(), global_step)
-
-        # Save sample spectrograms (original, gap, reconstructed) to tensorboard every `spectrogram_interval` batches
-        if (global_step % config['logging']['spectrogram_interval'] == 0):
-            orig_spectogram_sample     = spectrogram_target_phases[0].detach().cpu().numpy()
-            gap_spectrogram_sample     = (10 ** log_spectrogram_gaps[0]).detach().cpu().numpy()
-            reconst_spectrogram_sample = 10 ** model.reconstruct_audio(log_spectrogram_gaps, gap_masks)
-            reconst_spectrogram_sample = reconst_spectrogram_sample[0].detach().cpu().numpy()
-            gap_start_s                = gap_ints_s[0, 0].item()
-            gap_end_s                  = gap_ints_s[0, 1].item()
-            vis_kwargs = {
-                'sample_rate': config['data']['sample_rate'],
-                'hop_length': config['data']['spectrogram']['hop_length'],
-                'in_db': False,
-                'gap_int': (gap_start_s, gap_end_s)
-            }
-            # Create figures (function returns figure object)
-            fig_orig = utils.visualize_spectrogram(orig_spectogram_sample, title="Original Spectogram", **vis_kwargs)
-            fig_imp  = utils.visualize_spectrogram(gap_spectrogram_sample, title="Spectrogram w/ Gap", **vis_kwargs)
-            fig_gen  = utils.visualize_spectrogram(reconst_spectrogram_sample, title="Reconstructed Spectrogram", **vis_kwargs)
-
-            # Log figures to TensorBoard
-            if fig_orig: writer.add_figure("Spectrograms/Original", fig_orig, global_step)
-            if fig_imp: writer.add_figure("Spectrograms/Impaired", fig_imp, global_step)
-            if fig_gen: writer.add_figure("Spectrograms/Generated", fig_gen, global_step)
-            plt.close('all') # Close all generated figures
-
+                             
         # Increment batch step
         global_step += 1
 
@@ -174,16 +149,51 @@ for epoch in range(num_epochs):
             loss = criterion((10 ** log_spectrogram_reconstructed) * gap_masks, torch.abs(spectrogram_target_phases) * gap_masks)        # Remove phase info from spectrogram_target_phase
 
             running_test_loss += loss.item()
+        
+    # Save sample spectrograms (original, gap, reconstructed) to tensorboard every `spectrogram_interval` batches
+    # NOTE: Uses the first sample from the last test batch
+    if (global_step % config['logging']['spectrogram_interval'] == 0):
+        orig_spectogram_sample     = spectrogram_target_phases[0].detach().cpu().numpy()
+        gap_spectrogram_sample     = (10 ** log_spectrogram_gaps[0]).detach().cpu().numpy()
+        reconst_spectrogram_sample = 10 ** model.reconstruct_audio(log_spectrogram_gaps, gap_masks)
+        reconst_spectrogram_sample = reconst_spectrogram_sample[0].detach().cpu().numpy()
+        gap_start_s                = gap_ints_s[0, 0].item()
+        gap_end_s                  = gap_ints_s[0, 1].item()
+        vis_kwargs = {
+            'sample_rate': config['data']['sample_rate'],
+            'hop_length': config['data']['spectrogram']['hop_length'],
+            'in_db': False,
+            'gap_int': (gap_start_s, gap_end_s)
+        }
+        # Create figures (function returns figure object)
+        fig_orig = utils.visualize_spectrogram(abs(orig_spectogram_sample), title="Original Spectogram", **vis_kwargs)
+        fig_imp  = utils.visualize_spectrogram(gap_spectrogram_sample, title="Spectrogram w/ Gap", **vis_kwargs)
+        fig_gen  = utils.visualize_spectrogram(reconst_spectrogram_sample, title="Reconstructed Spectrogram", **vis_kwargs)
+
+        # Log figures to TensorBoard
+        if fig_orig: writer.add_figure("Spectrograms/Original", fig_orig, global_step)
+        if fig_imp:  writer.add_figure("Spectrograms/Impaired", fig_imp, global_step)
+        if fig_gen:  writer.add_figure("Spectrograms/Generated", fig_gen, global_step)
+        plt.close('all') # Close all generated figures
+
+        # Also save all audio files to tensorboard
+        orig_audio_sample    = utils.spectrogram_to_audio(orig_spectogram_sample, phase_info=True, n_fft=config['data']['spectrogram']['n_fft'])
+        gap_audio_sample     = utils.spectrogram_to_audio(gap_spectrogram_sample, phase_info=False, n_fft=config['data']['spectrogram']['n_fft'])
+        reconst_audio_sample = utils.spectrogram_to_audio(reconst_spectrogram_sample, phase_info=False, n_fft=config['data']['spectrogram']['n_fft'])
+        utils.save_audio(orig_audio_sample, Path(config['paths']['sample_dir']) / run_name / f"orig_audio_{global_step}.flac")
+        utils.save_audio(gap_audio_sample, Path(config['paths']['sample_dir']) / run_name / f"gap_audio_{global_step}.flac")
+        utils.save_audio(reconst_audio_sample, Path(config['paths']['sample_dir']) / run_name / f"reconstructed_audio_{global_step}.flac")
+        writer.add_audio("Audio/Original", orig_audio_sample, global_step, sample_rate=config['data']['sample_rate'])
+        writer.add_audio("Audio/Impaired", gap_audio_sample, global_step, sample_rate=config['data']['sample_rate'])
+        writer.add_audio("Audio/Generated", reconst_audio_sample, global_step, sample_rate=config['data']['sample_rate'])
 
     # Write test loss to Tensorboard
     avg_test_loss = running_test_loss / len(test_loader)
     writer.add_scalar('Test_Loss', avg_test_loss, epoch + 1)
 
-    # Save sample spectogram audio files to tensorboard
-
     # Save model every `checkpoint_interval` epochs
     if ((epoch + 1) % config['logging']['checkpoint_interval'] == 0):
-        mdl_path = Path(config['paths']['checkpoint_dir']) / f"blstm_cnn_epoch_{epoch+1}.pt"
+        mdl_path = Path(config['paths']['checkpoint_dir']) / run_name /  f"blstm_cnn_epoch_{epoch+1}.pt"
         torch.save(model.state_dict(), mdl_path)
 
 print("Training Complete!")

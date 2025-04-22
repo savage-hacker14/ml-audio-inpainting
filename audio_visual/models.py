@@ -138,16 +138,7 @@ class StackedNormBLSTMModel(nn.Module):
         self.is_training = is_training
         self.dropout_rate = dropout_rate
         self.device = device
-        
-        # Bidirectional LSTM
-        # self.blstm = nn.LSTM(
-        #     input_size=self.net_dim[0],
-        #     hidden_size=self.net_dim[1],
-        #     num_layers=1,
-        #     batch_first=True,
-        #     bidirectional=True
-        # )
-        
+
         self.lstm_layers = nn.ModuleList()
         self.norm_layers = nn.ModuleList()
 
@@ -169,10 +160,6 @@ class StackedNormBLSTMModel(nn.Module):
         for i in range(self.num_layers):
             lstm_outputs, _ = self.lstm_layers[i](lstm_outputs)
             lstm_outputs = self.norm_layers[i](lstm_outputs)
-        
-        # # Apply dropout
-        # if self.is_training:
-        #     lstm_outputs = F.dropout(lstm_outputs, p=self.dropout_rate, training=True)
         
         # Fully connected layer
         logits = self.fc(lstm_outputs)
@@ -199,94 +186,18 @@ class StackedNormBLSTMModel(nn.Module):
 
         reconstructed_full_spectrogram = self(log_spectrogram_gap)             # Has grad
         gap_mask = gap_mask.float()             # Ensure gap mask is a float tensor for gradient flow
-        #print(f"reconstructed_full_spectrogram size: {reconstructed_full_spectrogram.size()}, mask size: {gap_mask.size()}")
 
-        # Convert spectrogram to dB before masking - Otherwise when visualizing the spectrograms, the amplitudes close to zero will vanish with -inf dB
-        # reconstructed_full_spectrogram_db = torch.from_numpy(librosa.amplitude_to_db(reconstructed_full_spectrogram.detach().cpu().numpy(), ref=np.max)).to("cuda")
-        # corrupted_spectrogram_db          = torch.from_numpy(librosa.amplitude_to_db(corrupted_spectrogram.detach().cpu().numpy(), ref=np.max)).to("cuda")
-        # reconstructed_gap_spectrogram = reconstructed_full_spectrogram_db * gap_mask + corrupted_spectrogram_db * (1 - gap_mask)  # Ensure gap is filled with the model output    
-        
         reconstructed_gap_spectrogram = reconstructed_full_spectrogram * gap_mask + log_spectrogram_gap * (1 - gap_mask)  # Ensure gap is filled with the model output    
-        #reconstructed_gap_spectrogram = torch.tensor(librosa.db_to_power(reconstructed_gap_spectrogram.detach().cpu().numpy())).to(self.device)  # Convert back to power spectrogram
 
         return 10 ** reconstructed_gap_spectrogram          # log magnitude --> magnitude
-    
-#################################################################################################
 
-class UNet(nn.Module):
-    def __init__(self, in_channels=1, base_channels=64):
-        super(UNet, self).__init__()
-
-        # Encoder
-        self.enc1 = self.conv_block(in_channels, base_channels)
-        self.enc2 = self.conv_block(base_channels, base_channels * 2)
-        self.enc3 = self.conv_block(base_channels * 2, base_channels * 4)
-
-        # Bottleneck
-        self.bottleneck = self.conv_block(base_channels * 4, base_channels * 8)
-
-        # Decoder
-        self.dec3 = self.up_block(base_channels * 8, base_channels * 4)
-        self.dec2 = self.up_block(base_channels * 4, base_channels * 2)
-        self.dec1 = self.up_block(base_channels * 2, base_channels)
-
-        # Final output
-        self.final_conv = nn.Conv2d(base_channels, 1, kernel_size=1)
-
-    def conv_block(self, in_c, out_c):
-        return nn.Sequential(
-            nn.Conv2d(in_c, out_c, kernel_size=3, padding=1),
-            nn.BatchNorm2d(out_c),
-            nn.ReLU(),
-            nn.Conv2d(out_c, out_c, kernel_size=3, padding=1),
-            nn.BatchNorm2d(out_c),
-            nn.ReLU()
-        )
-
-    def up_block(self, in_c, out_c):
-        return nn.Sequential(
-            nn.ConvTranspose2d(in_c, out_c, kernel_size=2, stride=2),
-            self.conv_block(out_c, out_c)
-        )
-
-    def forward(self, x):
-        # x: (batch_size, 1, freq_bins, timeframes)
-
-        # Encoder
-        e1 = self.enc1(x)
-        e2 = self.enc2(F.max_pool2d(e1, 2))
-        e3 = self.enc3(F.max_pool2d(e2, 2))
-
-        # Bottleneck
-        b = self.bottleneck(F.max_pool2d(e3, 2))
-
-        # Decoder with skip connections
-        d3 = self.dec3(b)
-        d3 = d3 + e3  # skip connection
-
-        d2 = self.dec2(d3)
-        d2 = d2 + e2
-
-        d1 = self.dec1(d2)
-        d1 = d1 + e1
-
-        out = self.final_conv(d1)
-        return out
-    
-    def reconstruct_audio(self, log_spectrogram_gap, gap_mask):
-        reconstructed_full_spectrogram = self(log_spectrogram_gap)             # Has grad
-        gap_mask = gap_mask.float()             # Ensure gap mask is a float tensor for gradient float
-        
-        return reconstructed_full_spectrogram * gap_mask + log_spectrogram_gap * (1 - gap_mask)  # Ensure gap is filled with the model output    
-    
-#################################################################################################
 
 class StackedBLSTMCNN(nn.Module):
     def __init__(self, in_channels=1, hidden_dim=128, num_layers=2, freq_bins=257):
         super(StackedBLSTMCNN, self).__init__()
 
         self.hidden_dim = hidden_dim
-        self.freq_bins = freq_bins  # Explicit frequency bins
+        self.freq_bins = freq_bins
         self.using_phase = in_channels == 2
 
         # Convolutional Encoder
@@ -301,10 +212,6 @@ class StackedBLSTMCNN(nn.Module):
             nn.BatchNorm2d(hidden_dim // 2),
             nn.ReLU(),
         )
-
-        # Reduce frequency dimension (Global Pooling)
-        #self.global_pool = nn.AdaptiveAvgPool2d((1, None))  # (batch, hidden_dim//2, 1, time)
-
         # LSTM Bottleneck
         self.lstm = nn.LSTM(input_size=freq_bins * hidden_dim // 2, hidden_size=hidden_dim,
                             num_layers=num_layers, batch_first=True, bidirectional=True)
@@ -330,30 +237,25 @@ class StackedBLSTMCNN(nn.Module):
         batch_size, _, freq_bins, timeframes = x.shape
 
         # CNN Encoder: Extract spatial features
-        x = self.encoder(x)  # (batch_size, hidden_dim//2, freq_bins, timeframes)
-
-        # Reduce frequency dimension with global pooling
-        # x = self.global_pool(x)  # (batch, hidden_dim//2, 1, time)
-        # x = x.squeeze(2)  # (batch, hidden_dim//2, time)
-        # x = x.permute(0, 2, 1)  # (batch, time, hidden_dim//2)
+        x = self.encoder(x)                                 # (batch_size, hidden_dim//2, freq_bins, timeframes)
 
         # Convert CNN encoder output to LSTM input shape
-        x = x.permute(0, 3, 1, 2)  # (batch, time, channels, freq)
-        x = x.reshape(batch_size, timeframes, -1)  # (batch, time, channels * freq)
+        x = x.permute(0, 3, 1, 2)                           # (batch, time, channels, freq)
+        x = x.reshape(batch_size, timeframes, -1)           # (batch, time, channels * freq)
 
         # LSTM Bottleneck
-        x, _ = self.lstm(x)  # (batch, time, hidden_dim * 2)
+        x, _ = self.lstm(x)                                 # (batch, time, hidden_dim * 2)
 
         # Project to match spectrogram size
-        x = self.projection(x)  # (batch, time, freq_bins * 16)
+        x = self.projection(x)                              # (batch, time, freq_bins * 16)
         # print(f"Projection output shape: {x.shape}")
-        x = x.view(batch_size, timeframes, 16, freq_bins)  # Reshape to (batch, time, channels, freq_bins)
-        x = x.permute(0, 2, 3, 1)  # (batch, channels, freq_bins, timeframes)
+        x = x.view(batch_size, timeframes, 16, freq_bins)   # Reshape to (batch, time, channels, freq_bins)
+        x = x.permute(0, 2, 3, 1)                           # (batch, channels, freq_bins, timeframes)
 
         # CNN Decoder
         #print(f"Pre decoder: {x.shape}")
-        x = self.decoder(x)  # (batch, 1, freq_bins, timeframes)
-        x = x.squeeze(1)      # Remove channel dimension for final output
+        x = self.decoder(x)                                 # (batch, 1, freq_bins, timeframes)
+        x = x.squeeze(1)                                    # Remove channel dimension for final output
 
         return x
     
@@ -365,8 +267,7 @@ class StackedBLSTMCNN(nn.Module):
             # 2 or mroe input channels due to phase, no need to unsqueeze 
             reconstructed_full_spectrogram = self(log_spectrogram_gap)
 
-        #print(f"Reconstructed shape: {reconstructed_full_spectrogram.shape}")
-        gap_mask = gap_mask.float()             # Ensure gap mask is a float tensor for gradient float
+        gap_mask = gap_mask.float()
 
         # Combine magnitude and phase channels
         if (self.using_phase):
@@ -374,4 +275,5 @@ class StackedBLSTMCNN(nn.Module):
             log_spectrogram_gap            = log_spectrogram_gap[:, 0, :, :] + log_spectrogram_gap[:, 1, :, :] * 1j
 
         # NOTE: For phase model, the input spectrogram is NOT normalized thus neither is this output
-        return reconstructed_full_spectrogram * gap_mask + log_spectrogram_gap * (1 - gap_mask)  # Ensure gap is filled with the model output    
+        # Ensure gap is filled with the model output
+        return reconstructed_full_spectrogram * gap_mask + log_spectrogram_gap * (1 - gap_mask)

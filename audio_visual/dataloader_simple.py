@@ -54,7 +54,6 @@ class LibriSpeechDataset(Dataset):
         spectrogram_target_phase : torch.Tensor - True spectrogram (magnitude spectrogram with phase info, no gap)
         """
         file_path = self.file_paths[idx]
-        #print(f"File path: {file_path}")
 
         # Generate n_gaps_per_audio
         # TODO: Remove 5s audio hardcoded length
@@ -63,32 +62,27 @@ class LibriSpeechDataset(Dataset):
         gap_masks                  = torch.zeros((self.gaps_per_audio, self.n_fft // 2 + 1, math.ceil(DEFAULT_SAMPLE_RATE * 5 / self.hop_len)), dtype=torch.float32)
         gap_ints                   = torch.zeros((self.gaps_per_audio, 2), dtype=torch.float32)
         for i in range(self.gaps_per_audio):
-            # if (i == 0):
-            #     print(f"Load file path: {file_path}")
-
             # Load audio data (magnitude only)
             audio_data, sample_rate   = utils.load_audio(file_path)
 
             # Obtain audio data with gap
             audio_data_gap, gap_int_s = utils.add_random_gap(file_path, 0.2)      # Normally 0.2, NO GAP inserted
 
-            # Extract energy spectrogram (with phase info) for true audio (allows for better reconstruction later via iSTFT in test.py)
+            # Extract energy spectrogram (with phase info) for true audio (allows for better reconstruction later via iSTFT)
             # However, only extract log magnitude for the gap (this is what will be passed into the model)
             spectrogram_target_phase = utils.extract_spectrogram(audio_data, n_fft=self.n_fft, hop_length=self.hop_len, win_length=self.win_len)
             spectrogram_gap          = np.abs(utils.extract_spectrogram(audio_data_gap, n_fft=self.n_fft, hop_length=self.hop_len, win_length=self.win_len))        # Model does NOT support complex numbers, so we only take the magnitude
 
             # NEW: Convert magnitude spectrograms to log magnitude spectrograms (suggested normalization in Audio-Visual paper)
-            #spectrogram_target = librosa.power_to_db(spectrogram_target, ref=np.max)
-            spectrogram_gap          = np.log10(spectrogram_gap + 1e-9)           # Add small epsilon to avoid log(0) - CHECK how this works for complex numbers
+            spectrogram_gap          = np.log10(spectrogram_gap + 1e-9)           # Add small epsilon to avoid log(0)
 
             # Convert target and gap spectrograms to PyTorch tensors
             n_timeframes = spectrogram_target_phases.shape[2]
-            spectrogram_target_phases[i] = torch.from_numpy(spectrogram_target_phase[:, :n_timeframes])      # Takes care of any off-by-1 errors due to rounding
+            spectrogram_target_phases[i] = torch.from_numpy(spectrogram_target_phase[:, :n_timeframes])             # Takes care of any off-by-1 errors due to rounding
             spectrogram_gaps[i]          = torch.tensor(spectrogram_gap[:, :n_timeframes], dtype=torch.float32)
             gap_ints[i]                  = torch.tensor(gap_int_s, dtype=torch.float32)
 
             # Create gap mask
-            # gap_mask      = torch.ones_like(spectrogram_gaps[i], dtype=torch.float32)
             gap_mask      = torch.zeros_like(spectrogram_gaps[i], dtype=torch.float32)
             gap_start_idx = librosa.time_to_frames(gap_int_s[0], sr=sample_rate, hop_length=self.hop_len)
             gap_end_idx   = librosa.time_to_frames(gap_int_s[1], sr=sample_rate, hop_length=self.hop_len)
@@ -127,7 +121,6 @@ if __name__ == "__main__":
 
         print()
         print(f"min/max spectrogram gap: {spectrogram_gap.min()}, {spectrogram_gap.max()}")
-        #print(f"min/max spectrogram orig: {spectrogram_target_phase.min()}, {spectrogram_target_phase.max()}")         # .min() doesn't work for torch ComplexFloat
 
         # Visualize the histograms
         import matplotlib.pyplot as plt

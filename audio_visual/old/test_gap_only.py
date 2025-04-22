@@ -14,12 +14,13 @@ import matplotlib.pyplot as plt
 
 import sys
 sys.path.append("..")
+sys.path.append("../..")
 from config import LIBRISPEECH_ROOT, DEFAULT_SAMPLE_RATE
 import utils
 import librosa
 
-from models import StackedBLSTMModelGapOnly
-from audio_visual.dataset import LibriSpeechDataset
+from models_OLD import StackedBLSTMModelGapOnly
+from audio_visual.old.dataloader import LibriSpeechDataset
 
 # Load config file
 import yaml
@@ -29,7 +30,7 @@ with open('blstm.yaml', 'r') as f:
 # Load the model
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = StackedBLSTMModelGapOnly(config, dropout_rate=0, is_training=False)
-model.load_state_dict(torch.load('checkpoints/blstm_gap_only_2025_04_04_epoch_49.pt', weights_only=False))
+model.load_state_dict(torch.load('../checkpoints/blstm_gap_only_2025_04_04_best_2.pt', weights_only=False))
 print(f"Device: {device}")
 print(model)
 model.to(device)
@@ -39,8 +40,9 @@ N_FFT    = config['n_fft']
 HOP_LEN  = config['hop_length']
 WIN_LEN  = config['hann_win_length']
 N_EPOCHS = config['max_n_epochs']
-N_FILES = config['n_files']
+N_FILES  = config['n_files']
 GAPS_PER_AUDIO = config['gaps_per_audio']
+
 dataset = LibriSpeechDataset(root_dir=LIBRISPEECH_ROOT, 
                              n_files=N_FILES,
                              n_gaps_per_audio=GAPS_PER_AUDIO,

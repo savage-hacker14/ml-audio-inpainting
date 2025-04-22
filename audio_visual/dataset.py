@@ -36,7 +36,7 @@ class LibriSpeechDataset(Dataset):
         self.max_len_s      = data_cfg['max_len_s']
         self.gap_len_s      = data_cfg['gap_len_s']
 
-        self.max_files      = data_cfg['train_limit']
+        self.max_files      = data_cfg['n_files']
         self.gaps_per_audio = data_cfg['gaps_per_audio']
 
         # Determine dataset path

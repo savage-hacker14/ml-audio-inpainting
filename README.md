@@ -63,7 +63,7 @@ ml-audio-inpainting/
 
 ## Getting Started
 
-### Prerequisitesa
+### Prerequisites
 1. Install Python (>= 3.8).
 2. Install required dependencies using `pip`:
    ```bash

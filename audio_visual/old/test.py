@@ -15,8 +15,8 @@ from config import LIBRISPEECH_ROOT
 import utils
 import librosa
 
-from models import StackedBLSTMModel, StackedNormBLSTMModel
-from audio_visual.old.dataloader import LibriSpeechDataset
+from models_OLD import StackedBLSTMModel, StackedNormBLSTMModel
+from dataloader import LibriSpeechDataset
 
 # Load config file
 import yaml
@@ -26,7 +26,7 @@ with open('blstm.yaml', 'r') as f:
 # Load the model
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = StackedNormBLSTMModel(config, dropout_rate=0, is_training=False)
-model.load_state_dict(torch.load('checkpoints/blstm_2025_03_28_v4_epoch_36.pt', weights_only=False))
+model.load_state_dict(torch.load('../checkpoints/blstm_2025_03_28_v4_epoch_36.pt', weights_only=False))
 print(model)
 model.to(device)
 

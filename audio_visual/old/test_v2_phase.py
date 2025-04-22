@@ -19,12 +19,12 @@ from config import LIBRISPEECH_ROOT
 import utils
 import librosa
 
-from models import *
+from models_OLD import *
 from dataloader_phase import LibriSpeechDataset
 
 # Load config file
 import yaml
-with open('../blstm.yaml', 'r') as f:
+with open('blstm.yaml', 'r') as f:
     config = yaml.safe_load(f)
 
 # Load the model

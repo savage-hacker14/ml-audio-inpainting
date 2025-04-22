@@ -9,10 +9,11 @@ import configparser
 
 import sys
 sys.path.append("..")
+sys.path.append("../..")
 from config import LIBRISPEECH_ROOT
 
-from models import StackedBLSTMModel, StackedNormBLSTMModel
-from audio_visual.old.dataloader import LibriSpeechDataset
+from models_OLD import StackedBLSTMModel, StackedNormBLSTMModel
+from dataloader import LibriSpeechDataset
 import librosa
 
 # Load config file

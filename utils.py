@@ -117,6 +117,68 @@ def audio_to_stft(
     # STUB: Finish later if time
     return
 
+def audio_to_spectrogram(
+    audio_data: np.ndarray,
+    n_fft: int = 512,
+    hop_length: int = 128,
+    win_length: Optional[int] = 512,
+    window: str = 'hann',
+    center: bool = True,
+    power: float = 1.0,
+    normalize: bool = True,
+    to_db: bool = False # Added option for db conversion
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Convert audio data to magnitude and phase spectrograms.
+
+    Parameters:
+        audio_data (np.ndarray): Audio time series.
+        n_fft (int): FFT window size.
+        hop_length (int): Hop length.
+        win_length (int): Window length.
+        window (str): Window type.
+        center (bool): Whether to pad input.
+        power (float): Exponent for magnitude (1.0 for energy).
+        normalize (bool): Apply log1p and simple scaling.
+        to_db (bool): Convert magnitude to dB scale.
+
+    Returns:
+        tuple: (magnitude_spectrogram, phase_spectrogram)
+    """
+    if win_length is None:
+        win_length = n_fft
+
+    stft_result = librosa.stft(
+        audio_data,
+        n_fft=n_fft,
+        hop_length=hop_length,
+        win_length=win_length,
+        window=window,
+        center=center
+    )
+
+    magnitude = np.abs(stft_result) ** power
+    phase = np.angle(stft_result)
+
+    if normalize:
+        # Log magnitude is common for audio ML
+        magnitude = np.log1p(magnitude)
+        # Simple scaling (adjust if needed, e.g., standardization)
+        # mag_min = np.min(magnitude)
+        # mag_max = np.max(magnitude)
+        # if mag_max > mag_min:
+        #     magnitude = (magnitude - mag_min) / (mag_max - mag_min) * 2 - 1 # Scale to [-1, 1]
+        # else:
+        #     magnitude = np.zeros_like(magnitude) # Handle constant magnitude case
+
+    if to_db:
+         # Ensure input to amplitude_to_db is non-log magnitude if normalize=False
+         mag_for_db = np.abs(stft_result) if normalize else magnitude
+         magnitude = librosa.amplitude_to_db(mag_for_db, ref=np.max)
+
+
+    return magnitude, phase
+
 def add_random_gap(
         file_path: Union[str, Path],
         gap_len: int,

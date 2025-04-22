@@ -21,7 +21,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")
 from VggLoss import VGGLoss
 from dataset import SpeechInpaintingDataset
 from networks import PConvUNet, Discriminator
-from utils import visualize_spectrogram, save_audio, spectrogram_to_audio
+from utils import visualize_spectrogram, save_audio, extract_spectrogram, spectrogram_to_audio
 
 # --- Configuration Loading ---
 def load_config(config_path="config.yaml"):
@@ -483,22 +483,21 @@ if __name__ == "__main__":
                     # For simplicity in saving, let's use orig phase + combined *log* mag for recon
                     combined_log_mag = generated_mag_np * (1 - mask_np) + orig_mag_np * mask_np
 
-                    # # Reconstruct using original phase + combined log magnitude
-                    # audio_recon_combined = spectrogram_to_audio(
-                    #      combined_log_mag, phase_np,
-                    #      hop_length=spec_cfg['hop_length'],
-                    #      win_length=spec_cfg['win_length'],
-                    #      window=spec_cfg['window'],
-                    #      normalize=True # Indicate input is log1p scaled
-                    # )
-                    # writer.add_audio("Audio/Generated_CombinedLogMag_OrigPhase", audio_recon_combined, global_step, sample_rate=data_cfg['sample_rate'])
-                    # save_audio(audio_recon_combined, sample_dir / f"step_{global_step}_recon_comb_origphase.flac", data_cfg['sample_rate'])
+                    # Reconstruct using original phase + combined log magnitude
+                    audio_recon_combined = spectrogram_to_audio(
+                         combined_log_mag, phase_np,
+                         hop_length=spec_cfg['hop_length'],
+                         win_length=spec_cfg['win_length'],
+                         window=spec_cfg['window']
+                    )
+                    writer.add_audio("Audio/Generated_CombinedLogMag_OrigPhase", audio_recon_combined, global_step, sample_rate=data_cfg['sample_rate'])
+                    save_audio(audio_recon_combined, sample_dir / f"step_{global_step}_recon_comb_origphase.flac", data_cfg['sample_rate'])
 
-                    # # Save original and impaired for reference
-                    # audio_orig = spectrogram_to_audio(orig_mag_np, phase_np, hop_length=spec_cfg['hop_length'], win_length=spec_cfg['win_length'], window=spec_cfg['window'], normalize=True)
-                    # audio_imp = spectrogram_to_audio(impaired_mag_np, phase_np, hop_length=spec_cfg['hop_length'], win_length=spec_cfg['win_length'], window=spec_cfg['window'], normalize=True)
-                    # save_audio(audio_orig, sample_dir / f"step_{global_step}_original.flac", data_cfg['sample_rate'])
-                    # save_audio(audio_imp, sample_dir / f"step_{global_step}_impaired.flac", data_cfg['sample_rate'])
+                    # Save original and impaired for reference
+                    audio_orig = spectrogram_to_audio(orig_mag_np, phase_np, hop_length=spec_cfg['hop_length'], win_length=spec_cfg['win_length'], window=spec_cfg['window'])
+                    audio_imp = spectrogram_to_audio(impaired_mag_np, phase_np, hop_length=spec_cfg['hop_length'], win_length=spec_cfg['win_length'], window=spec_cfg['window'])
+                    save_audio(audio_orig, sample_dir / f"step_{global_step}_original.flac", data_cfg['sample_rate'])
+                    save_audio(audio_imp, sample_dir / f"step_{global_step}_impaired.flac", data_cfg['sample_rate'])
 
 
                 generator.train() # Set back to train mode

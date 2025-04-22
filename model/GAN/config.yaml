@@ -31,7 +31,7 @@ model:
 # Training Configuration
 training:
   batch_size: 8          # Adjust based on GPU memory
-  epochs: 100              # Number of training epochs
+  epochs: 100            # Number of training epochs
   g_lr: 0.0002           # Generator learning rate
   d_lr: 0.0002           # Discriminator learning rate
   b1: 0.5                # Adam beta1 (Common for GANs)
@@ -43,9 +43,9 @@ training:
   lambda_vgg_perceptual: 4.0  # Weight for Lp 
   lambda_vgg_style: 500.0     # Weight for Ls
   lambda_mag_weighted: 0.2    # Weight for Lw (Magnitude-weighted L1)
-  resume_from_chkpt: false    # Resume from checkpoint 
-  resume_run_name: null       # Name of the run to resume from 
-  resume_epoch: null          # Resume from a specific epoch 
+  resume_from_chkpt: true    # Resume from checkpoint 
+  resume_run_name: GAN-board_vgg_20250415_232312       # Name of the run to resume from 
+  resume_epoch: 45          # Resume from a specific epoch 
 
 # Logging and Checkpointing
 paths:

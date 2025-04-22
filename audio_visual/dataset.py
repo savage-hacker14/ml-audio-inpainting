@@ -3,6 +3,7 @@
 # This Dataset class only loads a FIXED number of audio files, and adds `n_gaps_per_audio` gaps to each audio file
 
 import os
+from pathlib import Path
 import yaml
 import math
 import numpy as np
@@ -13,24 +14,52 @@ import sys
 sys.path.append("..")
 import utils
 import librosa
-from config import LIBRISPEECH_ROOT_PROCESSED, DEFAULT_SAMPLE_RATE
+
+def load_config(config_path):
+    with open(config_path, 'r') as f:
+        cfg = yaml.safe_load(f)
+
+    return cfg
 
 class LibriSpeechDataset(Dataset):
-    def __init__(self, root_dir, n_files, n_gaps_per_audio, n_fft, hop_len, win_len, transform=None):
-        self.root_dir   = root_dir
-        self.transform  = transform
-        self.n_fft      = n_fft
-        self.hop_len    = hop_len
-        self.win_len    = win_len
+    def __init__(self, config_path, dataset_type="train"):
+        # Load YAML and extract dataset parameters
+        full_cfg = load_config(config_path)
+        data_cfg = full_cfg['data']
 
-        self.max_files = n_files
-        self.gaps_per_audio = n_gaps_per_audio
+        self.root_dir       = data_cfg['root_path']
+        self.n_fft          = data_cfg['spectrogram']['n_fft']
+        self.hop_len        = data_cfg['spectrogram']['hop_length']
+        self.win_len        = data_cfg['spectrogram']['win_length']
 
-        self.file_paths = []
+        self.sr             = data_cfg['sample_rate']
+        self.max_len_s      = data_cfg['max_len_s']
+        self.gap_len_s      = data_cfg['gap_len_s']
+
+        self.max_files      = data_cfg['train_limit']
+        self.gaps_per_audio = data_cfg['gaps_per_audio']
+
+        # Determine dataset path
+        if (dataset_type == 'train'):
+            data_path_key = 'train_path'
+        elif (dataset_type == 'valid'):
+            data_path_key = 'valid_path'
+        elif (dataset_type == 'test'):
+            data_path_key = 'test_path'
+        else:
+            raise ValueError(f"Invalid dataset_type: {dataset_type}")
+
+        self.root_path = Path(data_cfg['root_path'])
+        self.dataset_dir = self.root_path / data_cfg[data_path_key]
+
+        # Check if path is valid
+        if (not os.path.exists(self.dataset_dir)):
+            raise ValueError(f"Path {self.dataset_dir} does not exist")
 
         # Recursively walk through the dataset and collect all FLAC file paths
         counter = 0
-        for subdir, _, files in os.walk(root_dir):
+        self.file_paths = []
+        for subdir, _, files in os.walk(self.dataset_dir):
             for file in files:
                 if (file.endswith('.flac') and counter < self.max_files):
                     self.file_paths.append(os.path.join(subdir, file))
@@ -56,17 +85,17 @@ class LibriSpeechDataset(Dataset):
         file_path = self.file_paths[idx]
 
         # Generate n_gaps_per_audio
-        # TODO: Remove 5s audio hardcoded length
-        spectrogram_gaps           = torch.zeros((self.gaps_per_audio, self.n_fft // 2 + 1, math.ceil(DEFAULT_SAMPLE_RATE * 5 / self.hop_len)), dtype=torch.float32)
-        spectrogram_target_phases  = torch.zeros((self.gaps_per_audio, self.n_fft // 2 + 1, math.ceil(DEFAULT_SAMPLE_RATE * 5 / self.hop_len)), dtype=torch.cfloat)
-        gap_masks                  = torch.zeros((self.gaps_per_audio, self.n_fft // 2 + 1, math.ceil(DEFAULT_SAMPLE_RATE * 5 / self.hop_len)), dtype=torch.float32)
+        # Pre-allocate tensors for speed with correct dimensions from configuration
+        spectrogram_gaps           = torch.zeros((self.gaps_per_audio, self.n_fft // 2 + 1, math.ceil(self.sr * self.max_len_s / self.hop_len)), dtype=torch.float32)
+        spectrogram_target_phases  = torch.zeros((self.gaps_per_audio, self.n_fft // 2 + 1, math.ceil(self.sr * self.max_len_s / self.hop_len)), dtype=torch.cfloat)
+        gap_masks                  = torch.zeros((self.gaps_per_audio, self.n_fft // 2 + 1, math.ceil(self.sr * self.max_len_s / self.hop_len)), dtype=torch.float32)
         gap_ints                   = torch.zeros((self.gaps_per_audio, 2), dtype=torch.float32)
         for i in range(self.gaps_per_audio):
-            # Load audio data (magnitude only)
+            # Load audio data
             audio_data, sample_rate   = utils.load_audio(file_path)
 
             # Obtain audio data with gap
-            audio_data_gap, gap_int_s = utils.add_random_gap(file_path, 0.2)      # Normally 0.2, NO GAP inserted
+            audio_data_gap, gap_int_s = utils.add_random_gap(file_path, self.gap_len_s)
 
             # Extract energy spectrogram (with phase info) for true audio (allows for better reconstruction later via iSTFT)
             # However, only extract log magnitude for the gap (this is what will be passed into the model)
@@ -77,8 +106,8 @@ class LibriSpeechDataset(Dataset):
             spectrogram_gap          = np.log10(spectrogram_gap + 1e-9)           # Add small epsilon to avoid log(0)
 
             # Convert target and gap spectrograms to PyTorch tensors
-            n_timeframes = spectrogram_target_phases.shape[2]
-            spectrogram_target_phases[i] = torch.from_numpy(spectrogram_target_phase[:, :n_timeframes])             # Takes care of any off-by-1 errors due to rounding
+            n_timeframes                 = spectrogram_target_phases.shape[2]
+            spectrogram_target_phases[i] = torch.from_numpy(spectrogram_target_phase[:, :n_timeframes])             # Take care of any off-by-1 errors due to rounding
             spectrogram_gaps[i]          = torch.tensor(spectrogram_gap[:, :n_timeframes], dtype=torch.float32)
             gap_ints[i]                  = torch.tensor(gap_int_s, dtype=torch.float32)
 
@@ -92,17 +121,12 @@ class LibriSpeechDataset(Dataset):
         return spectrogram_gaps, gap_ints, gap_masks, spectrogram_target_phases
 
 if __name__ == "__main__":
-    # Load BLSTM config
-    with open('blstm.yaml', 'r') as f:
-        config = yaml.safe_load(f)
+    # Load config
+    config_path = 'cnn_blstm.yaml'
+    config = load_config(config_path)
+    config = config['data']['spectrogram']
 
-
-    dataset = LibriSpeechDataset(root_dir=LIBRISPEECH_ROOT_PROCESSED, 
-                                 n_files=16,
-                                 n_gaps_per_audio=10,
-                                 n_fft=config['n_fft'], 
-                                 hop_len=config['hop_length'],
-                                 win_len=config['hann_win_length'])
+    dataset = LibriSpeechDataset(config_path)
 
     data_loader = DataLoader(
         dataset,
@@ -127,19 +151,19 @@ if __name__ == "__main__":
         fig1 = utils.visualize_spectrogram(np.abs(spectrogram_target_phase[0, 0]), 
                                            in_db=False, 
                                            n_fft=config['n_fft'], 
-                                           win_length=config['hann_win_length'], 
+                                           win_length=config['win_length'], 
                                            hop_length=config['hop_length'], 
                                            title="Original Audio Spectrogram")
         fig2 = utils.visualize_spectrogram(10 ** spectrogram_gap[0, 0], 
                                            in_db=False, gap_int=tuple(gap_int_s[0, 0]), 
                                            n_fft=config['n_fft'], 
-                                           win_length=config['hann_win_length'], 
+                                           win_length=config['win_length'], 
                                            hop_length=config['hop_length'], 
                                            title="Original Audio Spectrogram with Gap (White)")
         fig3 = utils.visualize_spectrogram(spectrogram_target_phase[0, 0] * gap_mask[0, 0],
                                            in_db=False, gap_int=tuple(gap_int_s[0, 0]), 
                                            n_fft=config['n_fft'], 
-                                           win_length=config['hann_win_length'], 
+                                           win_length=config['win_length'], 
                                            hop_length=config['hop_length'], 
                                            title="Gap Spectrogram")
 
@@ -155,7 +179,7 @@ if __name__ == "__main__":
         spectrogram_target_phase_sample = (spectrogram_target_phase[0, 0]).detach().cpu().numpy()
         utils.save_audio(utils.spectrogram_to_audio(spectrogram_target_phase_sample, 
                                                     phase_info=True, n_fft=config['n_fft'], 
-                                                    win_length=config['hann_win_length'], 
+                                                    win_length=config['win_length'], 
                                                     hop_length=config['hop_length']), 
                                                     f"output/dataloader_true_audio_test_{batch_idx}.flac")
 

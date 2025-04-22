@@ -16,7 +16,7 @@ sys.path.append("..")
 from config import LIBRISPEECH_ROOT
 
 from models import *
-from dataloader_simple import LibriSpeechDataset
+from audio_visual.dataset import LibriSpeechDataset
 import librosa
 
 # Load config file

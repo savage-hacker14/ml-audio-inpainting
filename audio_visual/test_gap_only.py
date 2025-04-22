@@ -19,7 +19,7 @@ import utils
 import librosa
 
 from models import StackedBLSTMModelGapOnly
-from dataloader_simple import LibriSpeechDataset
+from audio_visual.dataset import LibriSpeechDataset
 
 # Load config file
 import yaml

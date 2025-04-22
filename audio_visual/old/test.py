@@ -15,7 +15,7 @@ import utils
 import librosa
 
 from models import StackedBLSTMModel, StackedNormBLSTMModel
-from dataloader import LibriSpeechDataset
+from audio_visual.old.dataloader import LibriSpeechDataset
 
 # Load config file
 import yaml

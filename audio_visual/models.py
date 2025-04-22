@@ -287,6 +287,7 @@ class StackedBLSTMCNN(nn.Module):
 
         self.hidden_dim = hidden_dim
         self.freq_bins = freq_bins  # Explicit frequency bins
+        self.using_phase = in_channels == 2
 
         # Convolutional Encoder
         self.encoder = nn.Sequential(
@@ -357,8 +358,20 @@ class StackedBLSTMCNN(nn.Module):
         return x
     
     def reconstruct_audio(self, log_spectrogram_gap, gap_mask):
-        reconstructed_full_spectrogram = self(log_spectrogram_gap.unsqueeze(1))             # Add channel dimension for CNN encoder input
+        print(f"shape: {log_spectrogram_gap.shape}")
+        if (not self.using_phase):
+            reconstructed_full_spectrogram = self(log_spectrogram_gap.unsqueeze(1))             # Add channel dimension for CNN encoder input
+        else:
+            # 2 or mroe input channels due to phase, no need to unsqueeze 
+            reconstructed_full_spectrogram = self(log_spectrogram_gap)
+
         #print(f"Reconstructed shape: {reconstructed_full_spectrogram.shape}")
         gap_mask = gap_mask.float()             # Ensure gap mask is a float tensor for gradient float
-        
+
+        # Combine magnitude and phase channels
+        if (self.using_phase):
+            reconstructed_full_spectrogram = reconstructed_full_spectrogram[:, 0, :, :] + reconstructed_full_spectrogram[:, 1, :, :] * 1j
+            log_spectrogram_gap            = log_spectrogram_gap[:, 0, :, :] + log_spectrogram_gap[:, 1, :, :] * 1j
+
+        # NOTE: For phase model, the input spectrogram is NOT normalized thus neither is this output
         return reconstructed_full_spectrogram * gap_mask + log_spectrogram_gap * (1 - gap_mask)  # Ensure gap is filled with the model output    

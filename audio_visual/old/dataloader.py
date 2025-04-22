@@ -6,6 +6,7 @@ from torch.utils.data import Dataset, DataLoader
 
 import sys
 sys.path.append("..")
+sys.path.append("../..")
 import utils
 import librosa
 from config import LIBRISPEECH_ROOT_PROCESSED

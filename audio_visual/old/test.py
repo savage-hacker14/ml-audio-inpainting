@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 
 import sys
 sys.path.append("..")
+sys.path.append("../..")
 from config import LIBRISPEECH_ROOT
 import utils
 import librosa

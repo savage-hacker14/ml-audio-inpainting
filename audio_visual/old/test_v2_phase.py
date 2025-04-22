@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 
 import sys
 sys.path.append("..")
+sys.path.append("../..")
 from config import LIBRISPEECH_ROOT
 import utils
 import librosa
@@ -23,7 +24,7 @@ from dataloader_phase import LibriSpeechDataset
 
 # Load config file
 import yaml
-with open('blstm.yaml', 'r') as f:
+with open('../blstm.yaml', 'r') as f:
     config = yaml.safe_load(f)
 
 # Load the model
@@ -31,7 +32,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 #model = StackedBLSTMModel(config, dropout_rate=0, is_training=False)
 IN_CHANNELS = 2
 model = StackedBLSTMCNN(IN_CHANNELS, 128, 3)
-model.load_state_dict(torch.load('checkpoints/blstm_cnn_phase_h128_2025_04_14_epoch_26.pt', weights_only=False))
+model.load_state_dict(torch.load('../checkpoints/blstm_cnn_phase_h128_2025_04_14_epoch_26.pt', weights_only=False))
 print(model)
 model.to(device)
 

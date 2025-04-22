@@ -21,7 +21,7 @@ import librosa
 
 # Load config file
 import yaml
-with open('blstm.yaml', 'r') as f:
+with open('../blstm.yaml', 'r') as f:
     config = yaml.safe_load(f)
 
 # Create the model

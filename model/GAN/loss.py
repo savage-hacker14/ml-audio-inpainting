@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torchvision.models import vgg19, VGG19_Weights
 from typing import List, Dict, Tuple
 
@@ -55,7 +54,10 @@ class VGGLoss(nn.Module):
         """Calculate Gram matrix."""
         b, c, h, w = x.size()
         features = x.view(b, c, h * w)
-        gram = torch.bmm(features, features.transpose(1, 2)) # Batch matrix multiplication
+        
+        # Batch matrix multiplication
+        gram = torch.bmm(features, features.transpose(1, 2)) 
+        
         # Normalize by number of elements in feature map
         return gram.div(c * h * w)
 

@@ -18,10 +18,10 @@ import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from VggLoss import VGGLoss
+from loss import VGGLoss
 from dataset import SpeechInpaintingDataset
 from networks import PConvUNet, Discriminator
-from utils import visualize_spectrogram, save_audio, extract_spectrogram, spectrogram_to_audio
+from utils import visualize_spectrogram, save_audio, spectrogram_to_audio
 
 # --- Configuration Loading ---
 def load_config(config_path="config.yaml"):
@@ -31,7 +31,7 @@ def load_config(config_path="config.yaml"):
 
 # --- Loss Functions ---
 def calculate_losses(cfg, generated_mag, original_mag, mask, d_fake_pred,
-                     vgg_loss_calculator: Optional[VGGLoss] = None): # <-- Add VGG calculator
+                     vgg_loss_calculator: Optional[VGGLoss] = None):
     """Calculates all generator losses based on config weights."""
     loss_cfg = cfg['training']
     bce_loss = nn.BCEWithLogitsLoss()
@@ -41,8 +41,7 @@ def calculate_losses(cfg, generated_mag, original_mag, mask, d_fake_pred,
     target_real = torch.ones_like(d_fake_pred)
     g_loss_adv = bce_loss(d_fake_pred, target_real)
 
-    # Reconstruction Losses (L1)
-    # Ensure shapes are broadcastable: (B, C, H, W)
+    # Reconstruction Losses (L1) [Brodcast: (B, C, H, W)]
     mask = mask.view_as(generated_mag) if mask.dim() < generated_mag.dim() else mask
     if generated_mag.shape[1] != 1: generated_mag = generated_mag[:, :1] # Ensure 1 channel for L1
     if original_mag.shape[1] != 1: original_mag = original_mag[:, :1]
@@ -63,27 +62,19 @@ def calculate_losses(cfg, generated_mag, original_mag, mask, d_fake_pred,
     mag_weight = torch.abs(original_mag)
     g_loss_mag_weighted = torch.mean(torch.abs(generated_mag - original_mag) * mag_weight)
 
-
     # --- VGG Perceptual and Style Loss ---
     g_loss_vgg_perceptual = torch.tensor(0.0, device=generated_mag.device)
     g_loss_vgg_style = torch.tensor(0.0, device=generated_mag.device)
-    if vgg_loss_calculator is not None and \
-       (loss_cfg['lambda_vgg_perceptual'] > 0 or loss_cfg['lambda_vgg_style'] > 0):
-        try:
-             # Pass generated (Tanh output) and original (log1p output)
-             g_loss_vgg_perceptual, g_loss_vgg_style = vgg_loss_calculator(generated_mag, original_mag)
-        except Exception as e:
-             print(f"ERROR calculating VGG loss: {e}")
-             # Optionally raise e or just skip VGG loss for this batch
-
+    if vgg_loss_calculator is not None and (loss_cfg['lambda_vgg_perceptual'] > 0 or loss_cfg['lambda_vgg_style'] > 0):
+        g_loss_vgg_perceptual, g_loss_vgg_style = vgg_loss_calculator(generated_mag, original_mag)
 
     # Total Generator Loss
     g_loss_total = (loss_cfg['lambda_adv'] * g_loss_adv +
                     loss_cfg['lambda_l1_valid'] * g_loss_l1_valid +
                     loss_cfg['lambda_l1_hole'] * g_loss_l1_hole +
                     loss_cfg['lambda_mag_weighted'] * g_loss_mag_weighted +
-                    loss_cfg['lambda_vgg_perceptual'] * g_loss_vgg_perceptual + # <-- Add VGG losses
-                    loss_cfg['lambda_vgg_style'] * g_loss_vgg_style)            # <-- Add VGG losses
+                    loss_cfg['lambda_vgg_perceptual'] * g_loss_vgg_perceptual + 
+                    loss_cfg['lambda_vgg_style'] * g_loss_vgg_style)
 
     losses = {
         'g_total': g_loss_total,
@@ -91,8 +82,8 @@ def calculate_losses(cfg, generated_mag, original_mag, mask, d_fake_pred,
         'g_l1_valid': g_loss_l1_valid,
         'g_l1_hole': g_loss_l1_hole,
         'g_mag_weighted': g_loss_mag_weighted,
-        'g_vgg_perceptual': g_loss_vgg_perceptual, # <-- Add VGG losses to dict
-        'g_vgg_style': g_loss_vgg_style            # <-- Add VGG losses to dict
+        'g_vgg_perceptual': g_loss_vgg_perceptual, 
+        'g_vgg_style': g_loss_vgg_style
     }
     return losses
 
@@ -147,7 +138,7 @@ if __name__ == "__main__":
     spec_cfg = data_cfg['spectrogram']
 
     # --- Setup ---
-    run_name = f"{log_cfg['run_name']}_vgg_{time.strftime('%Y%m%d_%H%M%S')}" # Add vgg marker
+    run_name = f"{log_cfg['run_name']}_vgg_{time.strftime('%Y%m%d_%H%M%S')}"
 
     resume_from_checkpoint = train_cfg.get('resume_from_chkpt', False)
     resume_run_name  = train_cfg.get('resume_run_name', None)
@@ -170,7 +161,6 @@ if __name__ == "__main__":
     sample_dir.mkdir(parents=True, exist_ok=True)
     log_dir.mkdir(parents=True, exist_ok=True)
 
-
     # Logging
     logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s [%(levelname)s] %(message)s',
@@ -180,7 +170,7 @@ if __name__ == "__main__":
         logger.info(f"Resuming run: {run_name}")
     else: 
         logger.info(f"Starting run: {run_name}")
-    logger.info(f"Config: \n{yaml.dump(cfg, indent=2)}") # Pretty print config
+    logger.info(f"Config: \n{yaml.dump(cfg, indent=2)}")
 
     # Tensorboard
     writer = SummaryWriter(log_dir=str(tb_dir))
@@ -203,7 +193,7 @@ if __name__ == "__main__":
 
     train_loader = DataLoader(train_dataset, batch_size=train_cfg['batch_size'],
                               shuffle=True, num_workers=log_cfg['num_workers'],
-                              pin_memory=True, drop_last=True, persistent_workers=log_cfg['num_workers']>0) # Add persistent workers
+                              pin_memory=True, drop_last=True, persistent_workers=log_cfg['num_workers']>0)
     valid_loader = DataLoader(valid_dataset, batch_size=train_cfg['batch_size'],
                               shuffle=False, num_workers=log_cfg['num_workers'],
                               pin_memory=True, persistent_workers=log_cfg['num_workers']>0)
@@ -304,7 +294,7 @@ if __name__ == "__main__":
                     logger.info(f"Loading optimizer states from: {chkpt_path_opt}")
                     checkpoint = torch.load(chkpt_path_opt, map_location=device)
 
-                    # Check if keys exist before loading (for backward compatibility maybe)
+                    # Check if keys exist before loading (for backward compatibility)
                     if 'g_optimizer_state_dict' in checkpoint:
                          g_optimizer.load_state_dict(checkpoint['g_optimizer_state_dict'])
                     else:
@@ -359,7 +349,6 @@ if __name__ == "__main__":
             with torch.no_grad():
                 generated_mag = generator(impaired_mag, mask)
 
-
             # Real samples
             d_real_pred = discriminator(original_mag)
             target_real = torch.ones_like(d_real_pred, device=device)
@@ -376,12 +365,12 @@ if __name__ == "__main__":
             # --- Train Generator ---
             g_optimizer.zero_grad()
 
-            d_fake_pred_g = discriminator(generated_mag) # Use non-detached output
+            d_fake_pred_g = discriminator(generated_mag)
 
             # Calculate generator losses (Adv, L1s, MagWeighted, VGG)
             g_losses = calculate_losses(
                 cfg, generated_mag, original_mag, mask, d_fake_pred_g,
-                vgg_loss_calculator=vgg_loss_calc # Pass calculator instance
+                vgg_loss_calculator=vgg_loss_calc
             )
             g_loss = g_losses['g_total']
 
@@ -486,16 +475,30 @@ if __name__ == "__main__":
                     # Reconstruct using original phase + combined log magnitude
                     audio_recon_combined = spectrogram_to_audio(
                          combined_log_mag, phase_np,
+                         n_fft=spec_cfg['n_fft'],
                          hop_length=spec_cfg['hop_length'],
                          win_length=spec_cfg['win_length'],
                          window=spec_cfg['window']
                     )
+                    
                     writer.add_audio("Audio/Generated_CombinedLogMag_OrigPhase", audio_recon_combined, global_step, sample_rate=data_cfg['sample_rate'])
                     save_audio(audio_recon_combined, sample_dir / f"step_{global_step}_recon_comb_origphase.flac", data_cfg['sample_rate'])
 
                     # Save original and impaired for reference
-                    audio_orig = spectrogram_to_audio(orig_mag_np, phase_np, hop_length=spec_cfg['hop_length'], win_length=spec_cfg['win_length'], window=spec_cfg['window'])
-                    audio_imp = spectrogram_to_audio(impaired_mag_np, phase_np, hop_length=spec_cfg['hop_length'], win_length=spec_cfg['win_length'], window=spec_cfg['window'])
+                    audio_orig = spectrogram_to_audio(
+                        orig_mag_np, phase_np,
+                        n_fft=spec_cfg['n_fft'],
+                        hop_length=spec_cfg['hop_length'],
+                        win_length=spec_cfg['win_length'],
+                        window=spec_cfg['window']
+                    )
+                    audio_imp = spectrogram_to_audio(
+                        impaired_mag_np, phase_np,
+                        n_fft=spec_cfg['n_fft'],
+                        hop_length=spec_cfg['hop_length'],
+                        win_length=spec_cfg['win_length'],
+                        window=spec_cfg['window']
+                    )
                     save_audio(audio_orig, sample_dir / f"step_{global_step}_original.flac", data_cfg['sample_rate'])
                     save_audio(audio_imp, sample_dir / f"step_{global_step}_impaired.flac", data_cfg['sample_rate'])
 
@@ -525,7 +528,7 @@ if __name__ == "__main__":
         writer.add_scalar('Loss_Epoch/Generator_VGG_S_Avg', avg_g_loss_vgg_s, epoch + 1)
 
         # --- Validation Loop (Example - Calculate validation losses) ---
-        if (epoch + 1) % log_cfg.get('validation_interval', 5) == 0: # Add validation_interval to config?
+        if (epoch + 1) % log_cfg.get('validation_interval', 5) == 0:
             generator.eval()
             discriminator.eval()
             val_g_loss_total = 0.0
@@ -537,6 +540,7 @@ if __name__ == "__main__":
             val_g_loss_vgg_p = 0.0
             val_g_loss_vgg_s = 0.0
             val_batch_count = 0
+            
             logger.info(f"Running validation for epoch {epoch+1}...")
             with torch.no_grad():
                 val_progress_bar = tqdm(valid_loader, desc=f"Validation Epoch {epoch+1}", leave=False)
@@ -559,9 +563,10 @@ if __name__ == "__main__":
 
                     # --- Calculate G Loss ---
                     g_losses = calculate_losses(
-                        cfg, generated_mag, original_mag, mask, d_fake_pred, # Use d_fake_pred from validation
+                        cfg, generated_mag, original_mag, mask, d_fake_pred,
                         vgg_loss_calculator=vgg_loss_calc
                     )
+                    
                     val_g_loss_total += g_losses['g_total'].item()
                     val_g_loss_adv += g_losses['g_adv'].item()
                     val_g_loss_l1v += g_losses['g_l1_valid'].item()
@@ -584,7 +589,7 @@ if __name__ == "__main__":
             logger.info(f"Epoch {epoch+1} Validation: Avg G Loss: {avg_val_g_loss:.4f}, Avg D Loss: {avg_val_d_loss:.4f}")
             logger.info(f"  Avg Val G Losses -> Adv: {avg_val_g_adv:.4f}, L1V: {avg_val_g_l1v:.4f}, L1H: {avg_val_g_l1h:.4f}, Lw: {avg_val_g_lw:.4f}, VGG_P: {avg_val_g_vgg_p:.4f}, VGG_S: {avg_val_g_vgg_s:.4f}")
 
-            writer.add_scalar('Loss_Val/Generator_Total_Avg', avg_val_g_loss, global_step) # Log validation vs global step
+            writer.add_scalar('Loss_Val/Generator_Total_Avg', avg_val_g_loss, global_step)
             writer.add_scalar('Loss_Val/Discriminator_Avg', avg_val_d_loss, global_step)
             writer.add_scalar('Loss_Val/Generator_Adv_Avg', avg_val_g_adv, global_step)
             writer.add_scalar('Loss_Val/Generator_L1V_Avg', avg_val_g_l1v, global_step)

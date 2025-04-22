@@ -14,7 +14,7 @@ class SpeechInpaintingDataset(Dataset):
     PyTorch Dataset for loading LibriSpeech audio, creating gaps,
     and generating spectrograms/masks for the inpainting task.
     """
-    def __init__(self, cfg: Dict[str, Any], dataset_type: str = 'train'):
+    def __init__(self, cfg: Dict[str, Any], dataset_type: str = 'train') -> None:
         """
         Initialize the dataset.
 
@@ -81,12 +81,13 @@ class SpeechInpaintingDataset(Dataset):
             sample_rate=self.sample_rate,
             max_len=self.max_len_s
         )
+        
         if sr != self.sample_rate:
              raise ValueError(f"Sample rate mismatch: expected {self.sample_rate}, got {sr}")
         if len(original_audio) != self.max_samples:
             if np.all(original_audio == 0):
                 print(f"Warning: Got zero audio for {file_path}, possibly due to loading error. Skipping?")
-                # Option 1: Return dummy data (might skew training if frequent)
+                # Return dummy data (might skew training if frequent)
                 dummy_spec_shape = (self.spec_cfg['n_fft'] // 2 + 1, int(np.ceil(self.max_samples / self.spec_cfg['hop_length'])))
                 return {
                     'original_magnitude': torch.zeros(dummy_spec_shape, dtype=torch.float32),
@@ -94,8 +95,6 @@ class SpeechInpaintingDataset(Dataset):
                     'mask': torch.ones(dummy_spec_shape, dtype=torch.float32), # Mask all as valid
                     'original_phase': torch.zeros(dummy_spec_shape, dtype=torch.float32),
                 }
-                # Option 2: Try loading next index (complex with map-style dataset)
-                # return self.__getitem__((idx + 1) % len(self))
             else:
                  raise ValueError(f"Audio length mismatch: expected {self.max_samples}, got {len(original_audio)}")
 
@@ -119,7 +118,7 @@ class SpeechInpaintingDataset(Dataset):
             power=self.spec_cfg['power']
         )
 
-        impaired_magnitude, _ = audio_to_spectrogram( # Don't need impaired phase
+        impaired_magnitude, _ = audio_to_spectrogram(
             impaired_audio,
             n_fft=self.spec_cfg['n_fft'],
             hop_length=self.spec_cfg['hop_length'],
@@ -130,14 +129,13 @@ class SpeechInpaintingDataset(Dataset):
         )
 
         # 4. Create Spectrogram Mask
-        # Convert sample indices to frame indices
         hop_length = self.spec_cfg['hop_length']
-        # Ensure integer division behaves as expected (floor for start, ceil for end)
         gap_start_frame = gap_start_sample // hop_length
-        # Use ceiling to ensure the frame covering the end sample is included
+        # Ensure the frame covering the end sample is included w// ceil
         gap_end_frame = int(np.ceil(gap_end_sample / hop_length))
 
         num_frames = original_magnitude.shape[1]
+        
         # Clamp frame indices to valid range
         gap_start_frame = max(0, gap_start_frame)
         gap_end_frame = min(num_frames, gap_end_frame)
@@ -152,7 +150,7 @@ class SpeechInpaintingDataset(Dataset):
         original_magnitude_t = torch.from_numpy(original_magnitude).float()
         impaired_magnitude_t = torch.from_numpy(impaired_magnitude).float()
         mask_t = torch.from_numpy(spec_mask).float()
-        original_phase_t = torch.from_numpy(original_phase).float() # Keep for recon demo
+        original_phase_t = torch.from_numpy(original_phase).float()
 
         # Add channel dimension (C, H, W) -> (1, Freq, Time)
         return {

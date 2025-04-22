@@ -45,5 +45,7 @@ paths:
   resume_mdl_path: "checkpoints/blstm_cnn_h128_2025_04_06_BEST.pt"    # Path to model for resuming training
 
 logging:
-  checkpoint_interval: 5    # Save checkpoint every N epochs
-  run_name: "GAN-board"     # Name for Tensorboard run
+  checkpoint_interval: 5     # Save checkpoint every N epochs
+  metric_interval: 25        # Save loss metrics every N batches
+  spectrogram_interval: 100  # Save spectograms after each epoch
+  run_name: "GAN-board"      # Name for Tensorboard run

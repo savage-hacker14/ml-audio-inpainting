@@ -55,7 +55,7 @@ ml-audio-inpainting/
 │   ├── CNNBLSTM/       # CNN + BLSTM model
 │   ├── GAN/            # GAN model with VGG loss
 │   └── AudioReg/       # Auto-Regressive model
-├── add_gaps.py         # Script to introduce gaps in audio
+├── utils.py            # Utility files for models
 ├── requirements.txt    # Dependencies
 ```
 

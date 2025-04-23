@@ -1,0 +1,52 @@
+# blstm_large.yaml
+
+## Dataset config
+data:
+  dataset: "LibriSpeech"
+  root_path: "C:\\Users\\Jacob\\Documents\\2024\\Northeastern\\CS_6140\\Project\\LibriSpeech"
+  sample_rate: 16000            # Hz
+  train_path: "train-clean-100" # Training subset name of LibriSpeech dataset
+  test_path: "test-clean"       # Training subset name of LibriSpeech dataset
+  max_len_s: 5.0                # Max audio length in seconds
+  gap_len_s: 0.2                # Gap length in seconds
+  n_files: 100                  # Number of audio files used for training
+  gaps_per_audio: 25            # Will make n copies of the audio, with each copy having a gap at a different location 
+  spectrogram:
+    n_fft: 512                  # FFT window size
+    hop_length: 192             # Hop length (Consistent with n_fft/4 common practice)
+    win_length: 384             # Window length (same as n_fft)
+    window: "hann"              # Window type
+    normalize: true             # Normalize spectrograms (log magnitude + simple scaling)
+    power: 1.0                  # Use magnitude spectrogram (power=1)
+
+## Model config
+model:
+  input_dim: 417
+  in_channels: 1
+  num_lstm_layers: 3
+  lstm_hidden_dim: 128
+  enc_filters: [16, 32]
+  dec_filters: [16, 32]
+
+#### Optimizer config
+training:
+  batch_size: 1                         # Number of audio files used in batch, but total batch size is batch_size * gaps_per_audio
+  optimizer_type: adam
+  starter_learning_rate: 0.0001
+  lr_decay: 1.0
+  max_n_epochs: 50
+
+### Logging and Checkpointing
+paths:
+  tensorboard_dir: "./tensorboard"      # Directory for Tensorboard logs
+  checkpoint_dir: "./checkpoints_NEW"   # Directory for saving checkpoints
+  log_dir: "./logs"                     # Directory for saving logs
+  sample_dir: "./samples"               # Directory for saving generated samples
+  resume_mdl_path: "checkpoints/blstm_cnn_h128_2025_04_06_BEST.pt"    # Path to model for resuming training
+
+logging:
+  checkpoint_interval: 5     # Save checkpoint every N epochs
+  metric_interval: 25        # Save loss metrics every N batches
+  spectrogram_interval: 100  # Save spectograms after each epoch
+  audio_interval: 500        # Save audio files after every 5 epochs
+  run_name: "GAN-board"      # Name for Tensorboard run

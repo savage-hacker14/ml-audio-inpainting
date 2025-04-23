@@ -39,7 +39,7 @@ def insert_gap(audio_path, output_path, gap_start, gap_duration, sample_rate=160
 
 # Example usage
 if __name__ == "__main__":
-    input_filepath  = SAMPLE_AUDIO_FILE
+    input_filepath    = SAMPLE_AUDIO_FILE
     output_filepath   = f"output/200-126784-0006_W_GAP.flac"
     gap_start_time    = 2.0     # Time in seconds where the gap starts
     gap_duration_time = 5.0     # Duration of the silence in seconds

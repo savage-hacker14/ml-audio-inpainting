@@ -179,8 +179,8 @@ def add_random_gap(
     gap_interval = (gap_start_idx / sample_rate, (gap_start_idx + gap_length) / sample_rate)
 
     return audio_new, gap_interval
-
-# --- STFT Processing ---
+  
+ # --- STFT Processing ---
 
 def audio_to_stft(
     audio_data: np.ndarray,
@@ -206,69 +206,8 @@ def audio_to_stft(
         np.ndarray: _description_
     """
     # STUB: Finish later if time
-    return
+    raise NotImplementedError("audio_to_stft is not yet implemented.")
 
-def audio_to_spectrogram(
-    audio_data: np.ndarray,
-    n_fft: int = 512,
-    hop_length: int = 128,
-    win_length: Optional[int] = 512,
-    window: str = 'hann',
-    center: bool = True,
-    power: float = 1.0,
-    normalize: bool = True,
-    to_db: bool = False # Added option for db conversion
-) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Convert audio data to magnitude and phase spectrograms.
-
-    Parameters:
-        audio_data (np.ndarray): Audio time series.
-        n_fft (int): FFT window size.
-        hop_length (int): Hop length.
-        win_length (int): Window length.
-        window (str): Window type.
-        center (bool): Whether to pad input.
-        power (float): Exponent for magnitude (1.0 for energy).
-        normalize (bool): Apply log1p and simple scaling.
-        to_db (bool): Convert magnitude to dB scale.
-
-    Returns:
-        tuple: (magnitude_spectrogram, phase_spectrogram)
-    """
-    if win_length is None:
-        win_length = n_fft
-
-    stft_result = librosa.stft(
-        audio_data,
-        n_fft=n_fft,
-        hop_length=hop_length,
-        win_length=win_length,
-        window=window,
-        center=center
-    )
-
-    magnitude = np.abs(stft_result) ** power
-    phase = np.angle(stft_result)
-
-    if normalize:
-        # Log magnitude is common for audio ML
-        magnitude = np.log1p(magnitude)
-        # Simple scaling (adjust if needed, e.g., standardization)
-        # mag_min = np.min(magnitude)
-        # mag_max = np.max(magnitude)
-        # if mag_max > mag_min:
-        #     magnitude = (magnitude - mag_min) / (mag_max - mag_min) * 2 - 1 # Scale to [-1, 1]
-        # else:
-        #     magnitude = np.zeros_like(magnitude) # Handle constant magnitude case
-
-    if to_db:
-         # Ensure input to amplitude_to_db is non-log magnitude if normalize=False
-         mag_for_db = np.abs(stft_result) if normalize else magnitude
-         magnitude = librosa.amplitude_to_db(mag_for_db, ref=np.max)
-
-
-    return magnitude, phase
 
 def extract_spectrogram(
     audio_data: np.ndarray,
@@ -310,6 +249,7 @@ def extract_spectrogram(
     )
     
     return np.abs(stft) ** power
+
 
 def extract_mel_spectrogram(
     audio_data: np.ndarray,
@@ -355,8 +295,8 @@ def extract_mel_spectrogram(
     )
 
 def spectrogram_to_audio(
-    spectrogram,
-    phase= Optional[np.ndarray],
+    spectrogram: np.ndarray,
+    phase: Optional[np.ndarray] = None,
     n_fft=512,
     n_iter=64,
     window='hann',
@@ -499,7 +439,6 @@ def visualize_spectrogram(
     Figure or None
         The matplotlib Figure object if save_path is None, otherwise None
     """
-    # Adjust for STFT time shifts due to hop_len?? - NOTE: Gaps MIGHT be slightly off as a result
     if power not in (1, 2):
         raise ValueError("Power must be 1 (energy) or 2 (power)")
     
@@ -507,9 +446,9 @@ def visualize_spectrogram(
     if in_db:
         spectrogram_data = np.array(spectrogram)
     elif power == 1:
-        spectrogram_data = librosa.amplitude_to_db(spectrogram, ref=np.max)
+        spectrogram_data = librosa.amplitude_to_db(spectrogram, ref=np.max, amin=1e-5, top_db=80)
     else:  # power == 2
-        spectrogram_data = librosa.power_to_db(spectrogram, ref=np.max)
+        spectrogram_data = librosa.power_to_db(spectrogram, ref=np.max, amin=1e-5, top_db=80)
         
 
     fig, ax = plt.subplots(figsize=(10, 4))
@@ -527,8 +466,9 @@ def visualize_spectrogram(
     # Compute gap start and end indices and plot vertical lines
     if gap_int is not None:
         gap_start_s, gap_end_s = gap_int
-        ax.axvline(x=gap_start_s, color='red', linestyle='--', label='Gap Start')
-        ax.axvline(x=gap_end_s, color='red', linestyle='--', label='Gap End')
+
+        ax.axvline(x=gap_start_s, color='white', linestyle='--', label='Gap Start')
+        ax.axvline(x=gap_end_s, color='white', linestyle='--', label='Gap End')
         ax.legend()
 
     # Add colorbar and title
@@ -542,6 +482,7 @@ def visualize_spectrogram(
         output_dir = save_path.parent
         if output_dir and not output_dir.exists():
             output_dir.mkdir(parents=True, exist_ok=True)
+
         fig.savefig(save_path)
         plt.close(fig)
         return None

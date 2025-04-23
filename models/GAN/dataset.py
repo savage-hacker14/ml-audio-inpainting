@@ -113,7 +113,6 @@ class SpeechInpaintingDataset(Dataset):
             hop_length=self.spec_cfg['hop_length'],
             win_length=self.spec_cfg['win_length'],
             window=self.spec_cfg['window'],
-            normalize=self.spec_cfg['normalize'],
             power=self.spec_cfg['power']
         )
         
@@ -128,7 +127,6 @@ class SpeechInpaintingDataset(Dataset):
             hop_length=self.spec_cfg['hop_length'],
             win_length=self.spec_cfg['win_length'],
             window=self.spec_cfg['window'],
-            normalize=self.spec_cfg['normalize'],
             power=self.spec_cfg['power']
         )
         

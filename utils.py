@@ -180,8 +180,6 @@ def add_random_gap(
 
     return audio_new, gap_interval
   
- # --- STFT Processing ---
-
 # --- STFT Processing ---
 
 def extract_spectrogram(

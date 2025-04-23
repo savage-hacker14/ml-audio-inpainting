@@ -8,7 +8,6 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, Subset
 from torch.utils.tensorboard import SummaryWriter
 import yaml
-import os
 import logging
 from pathlib import Path
 import time

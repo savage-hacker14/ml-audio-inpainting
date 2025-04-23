@@ -8,7 +8,7 @@ data:
   train_path: "train-clean-100" # Training subset name of LibriSpeech dataset
   test_path: "test-clean"       # Training subset name of LibriSpeech dataset
   max_len_s: 5.0                # Max audio length in seconds
-  gap_len_s: 0.2                # Gap length in seconds
+  gap_len_s: 0.08               # Gap length in seconds
   n_files: 100                  # Number of audio files used for training
   gaps_per_audio: 25            # Will make n copies of the audio, with each copy having a gap at a different location 
   spectrogram:
@@ -34,7 +34,7 @@ training:
   optimizer_type: adam
   starter_learning_rate: 0.0001
   lr_decay: 1.0
-  max_n_epochs: 50
+  max_n_epochs: 75
 
 ### Logging and Checkpointing
 paths:
@@ -42,7 +42,7 @@ paths:
   checkpoint_dir: "./checkpoints_NEW"   # Directory for saving checkpoints
   log_dir: "./logs"                     # Directory for saving logs
   sample_dir: "./samples"               # Directory for saving generated samples
-  resume_mdl_path: "checkpoints/blstm_cnn_h128_2025_04_06_BEST.pt"    # Path to model for resuming training
+  resume_mdl_path: null #"checkpoints/blstm_cnn_h128_2025_04_06_BEST.pt"    # Path to model for resuming training
 
 logging:
   checkpoint_interval: 5     # Save checkpoint every N epochs

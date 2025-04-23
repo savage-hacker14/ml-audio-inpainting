@@ -13,13 +13,12 @@ import tqdm
 from datetime import datetime
 import matplotlib.pyplot as plt
 
-import sys
-sys.path.append("..")
-sys.path.append("../..")
 from pathlib import Path
+import sys
+sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
 
-from models import *
-from audio_visual.dataset import LibriSpeechDataset
+from model import *
+from dataset import LibriSpeechDataset
 import utils
 
 # Load config file

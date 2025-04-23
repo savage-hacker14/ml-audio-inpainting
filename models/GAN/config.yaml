@@ -1,4 +1,3 @@
-# config.yaml
 data:
   dataset: "LibriSpeech"
   root_path: "C:\\Users\\Jacob\\Documents\\2024\\Northeastern\\CS_6140\\Project\\LibriSpeech_360" # Added root path

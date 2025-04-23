@@ -49,4 +49,4 @@ logging:
   metric_interval: 25        # Save loss metrics every N batches
   spectrogram_interval: 100  # Save spectograms after each epoch
   audio_interval: 500        # Save audio files after every 5 epochs
-  run_name: "GAN-board"      # Name for Tensorboard run
+  run_name: "CNNBLSTM-board" # Name for Tensorboard run

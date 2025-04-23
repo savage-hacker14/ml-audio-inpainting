@@ -7,7 +7,7 @@ import sys
 
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
 
-from utils import load_audio, create_gap_mask, audio_to_spectrogram
+from utils import load_audio, create_gap_mask, extract_spectrogram
 
 class SpeechInpaintingDataset(Dataset):
     """
@@ -108,25 +108,32 @@ class SpeechInpaintingDataset(Dataset):
         impaired_audio = original_audio * time_domain_mask
 
         # 3. Compute Spectrograms (Magnitude and Phase)
-        original_magnitude, original_phase = audio_to_spectrogram(
-            original_audio,
-            n_fft=self.spec_cfg['n_fft'],
+        original_spectrogram = extract_spectrogram(
+            original_audio, n_fft=self.spec_cfg['n_fft'],
             hop_length=self.spec_cfg['hop_length'],
             win_length=self.spec_cfg['win_length'],
             window=self.spec_cfg['window'],
             normalize=self.spec_cfg['normalize'],
             power=self.spec_cfg['power']
         )
-
-        impaired_magnitude, _ = audio_to_spectrogram(
-            impaired_audio,
-            n_fft=self.spec_cfg['n_fft'],
+        
+        # Extract magnitude and phase from the complex spectrogram
+        original_magnitude = np.abs(original_spectrogram) ** self.spec_cfg['power']
+        original_magnitude = np.log1p(original_magnitude) if self.spec_normalize else original_magnitude
+        original_phase     = np.angle(original_spectrogram)
+        
+        # Recompute magnitude spectrogram for impaired audio
+        impaired_spectrogram = extract_spectrogram(
+            impaired_audio, n_fft=self.spec_cfg['n_fft'],
             hop_length=self.spec_cfg['hop_length'],
             win_length=self.spec_cfg['win_length'],
             window=self.spec_cfg['window'],
             normalize=self.spec_cfg['normalize'],
             power=self.spec_cfg['power']
         )
+        
+        impaired_magnitude = np.abs(impaired_spectrogram)
+        impaired_magnitude = np.log1p(impaired_magnitude) if self.spec_normalize else impaired_magnitude
 
         # 4. Create Spectrogram Mask
         hop_length = self.spec_cfg['hop_length']
@@ -139,7 +146,6 @@ class SpeechInpaintingDataset(Dataset):
         # Clamp frame indices to valid range
         gap_start_frame = max(0, gap_start_frame)
         gap_end_frame = min(num_frames, gap_end_frame)
-
 
         # Mask is 1 for valid regions, 0 for the gap (hole)
         spec_mask = np.ones_like(original_magnitude, dtype=np.float32)

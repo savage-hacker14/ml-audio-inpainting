@@ -10,11 +10,13 @@ from torch.utils.data import DataLoader, random_split
 import matplotlib.pyplot as plt
 
 import sys
-sys.path.append("..")
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
+
 import utils
 
-from models import *
-from audio_visual.dataset import LibriSpeechDataset
+from model import *
+from dataset import LibriSpeechDataset
 
 # Load config file
 import yaml

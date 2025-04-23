@@ -11,7 +11,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 
 import sys
-sys.path.append("..")
+sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
 import utils
 import librosa
 

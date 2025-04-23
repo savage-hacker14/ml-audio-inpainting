@@ -14,9 +14,9 @@ from pathlib import Path
 import time
 import numpy as np
 from tqdm import tqdm
-import sys
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+import sys
+sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
 
 from loss import VGGLoss
 from dataset import SpeechInpaintingDataset

@@ -182,32 +182,7 @@ def add_random_gap(
   
  # --- STFT Processing ---
 
-def audio_to_stft(
-    audio_data: np.ndarray,
-    n_fft: int = 2048,
-    hop_length: int = 512,
-    win_length: Optional[int] = None,
-    window: str = 'hann',
-    center: bool = True,
-) -> np.ndarray:
-    """
-    Compute the Short-Time Fourier Transform (STFT) of an audio signal.
-    This returns the complex-valued STFT matrix, required for lossless inversion.
-
-    Args:
-        audio_data (np.ndarray): Audio time series.
-        n_fft (int, optional): Length of the FFT window. Defaults to 2048.
-        hop_length (int, optional): _description_. Defaults to 512.
-        win_length (Optional[int], optional): _description_. Defaults to None.
-        window (str, optional): _description_. Defaults to 'hann'.
-        center (bool, optional): _description_. Defaults to True.
-
-    Returns:
-        np.ndarray: _description_
-    """
-    # STUB: Finish later if time
-    raise NotImplementedError("audio_to_stft is not yet implemented.")
-
+# --- STFT Processing ---
 
 def extract_spectrogram(
     audio_data: np.ndarray,
@@ -239,6 +214,9 @@ def extract_spectrogram(
     if power < 0:
         raise ValueError("Power must be non-negative")
     
+    if win_length is None:
+        win_length = n_fft
+    
     stft = librosa.stft(
         audio_data,
         n_fft=n_fft,
@@ -248,8 +226,7 @@ def extract_spectrogram(
         center=center
     )
     
-    return np.abs(stft) ** power
-
+    return stft
 
 def extract_mel_spectrogram(
     audio_data: np.ndarray,
@@ -297,6 +274,7 @@ def extract_mel_spectrogram(
 def spectrogram_to_audio(
     spectrogram: np.ndarray,
     phase: Optional[np.ndarray] = None,
+    phase_info: bool = False,
     n_fft=512,
     n_iter=64,
     window='hann',
@@ -314,6 +292,7 @@ def spectrogram_to_audio(
     -----------
     spectrogram (np.ndarray): The magnitude spectrogram to convert back to audio
     phase       (np.ndarray, optional): Phase information to use for reconstruction. If None, Griffin-Lim is used.
+    phase_info  (bool): If True, the input is assumed to be a phase spectrogram
     n_fft       (int): FFT window size
     n_iter      (int, optional): Number of iterations for Griffin-Lim algorithm
     window      (str): Window function to use
@@ -328,6 +307,10 @@ def spectrogram_to_audio(
     # If the input is in dB scale, convert back to amplitude
     if np.max(spectrogram) < 0 and np.mean(spectrogram) < 0:
         spectrogram = librosa.db_to_amplitude(spectrogram)
+    
+    if phase_info:
+        return librosa.istft(spectrogram, n_fft=n_fft, hop_length=hop_length, 
+                          win_length=win_length, window=window, center=center)
     
     # If phase information is provided, use it for reconstruction
     if phase is not None:

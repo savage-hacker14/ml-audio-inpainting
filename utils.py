@@ -1,4 +1,3 @@
-import os
 import numpy as np
 import librosa
 import librosa.display
@@ -9,6 +8,8 @@ from pathlib import Path
 from typing import Tuple, Optional, Union
 
 from config import DEFAULT_SAMPLE_RATE
+
+# --- Audio I/O ---
 
 def load_audio(
     file_path: Union[str, Path],
@@ -34,21 +35,106 @@ def load_audio(
     try:
         audio_data, sr = librosa.load(file_path, sr=sample_rate, mono=mono)
         
-        # Clip audio to max_len_s
-        max_samples = sample_rate * max_len
+        # Clip audio to max_len
+        max_samples = int(sample_rate * max_len)
         if len(audio_data) > max_samples:
             audio_data = audio_data[:max_samples]
         else:
-            # Add end padding of zeros if audio is less than max_len_s
+            padding = max_samples - len(audio_data)
             audio_data = np.pad(
                 audio_data, 
-                (0, max_samples - len(audio_data)), 
+                (0, padding), 
                 'constant'
             )
             
         return audio_data, sr
     except Exception as e:
         raise IOError(f"Error loading audio file {file_path}: {str(e)}")
+
+def save_audio(
+    audio_data: np.ndarray,
+    file_path: Union[str, Path],
+    sample_rate: int = DEFAULT_SAMPLE_RATE,
+    normalize: bool = True,
+    file_format: str = 'flac'
+) -> None:
+    """
+    Save audio data to a file.
+
+    Parameters
+    ----------
+    audio_data   (np.ndarray): Audio time series
+    file_path    (str or Path): Path to save the audio file
+    sample_rate  (int, optional): Sample rate of audio
+    normalize    (bool, optional): Whether to normalize audio before saving
+    file_format  (str, optional): Audio file format
+    
+    Returns
+    -------
+    None
+    """
+    output_dir = Path(file_path).parent
+    if output_dir and not output_dir.exists():
+        try:
+            output_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            raise IOError(f"Error creating directory {output_dir}: {str(e)}")
+        
+    # Normalize audio before saving
+    audio_data = librosa.util.normalize(audio_data) if normalize else audio_data
+    
+    try:
+        sf.write(file_path, audio_data, sample_rate, format=file_format)
+    except Exception as e:
+        raise IOError(f"Error saving audio to {file_path}: {str(e)}")
+
+# --- Gap Processing ---
+
+def create_gap_mask(
+    audio_len_samples: int,
+    gap_len_s: float,
+    sample_rate: int = DEFAULT_SAMPLE_RATE,
+) -> Tuple[np.ndarray, Tuple[int, int]]:
+    """
+    Creates a binary mask with a single gap of zeros at a random location.
+
+    Parameters
+    ----------
+    audio_len_samples : int
+        Length of the target audio in samples.
+    gap_len_s : float
+        Desired gap length in seconds.
+    sample_rate : int, optional
+        Sample rate. Defaults to DEFAULT_SAMPLE_RATE.
+
+    Returns
+    -------
+    Tuple[np.ndarray, Tuple[int, int]]
+        (mask, (gap_start_sample, gap_end_sample))
+        Mask is 1.0 for signal, 0.0 for gap (float32).
+        Interval is gap start/end indices in samples.
+    """
+    gap_len_samples = int(gap_len_s * sample_rate)
+
+    if gap_len_samples <= 0:
+        # No gap, return full mask and zero interval
+        return np.ones(audio_len_samples, dtype=np.float32), (0, 0)
+
+    if gap_len_samples >= audio_len_samples:
+        # Gap covers everything
+        print(f"Warning: Gap length ({gap_len_s}s) >= audio length. Returning all zeros mask.")
+        return np.zeros(audio_len_samples, dtype=np.float32), (0, audio_len_samples)
+
+    # Choose a random start position for the gap (inclusive range)
+    max_start_sample = audio_len_samples - gap_len_samples
+    gap_start_sample = np.random.randint(0, max_start_sample + 1)
+    gap_end_sample = gap_start_sample + gap_len_samples
+
+    # Create mask
+    mask = np.ones(audio_len_samples, dtype=np.float32)
+    mask[gap_start_sample:gap_end_sample] = 0.0
+
+    return mask, (gap_start_sample, gap_end_sample)
 
 def add_random_gap(
         file_path: Union[str, Path],
@@ -93,6 +179,35 @@ def add_random_gap(
     gap_interval = (gap_start_idx / sample_rate, (gap_start_idx + gap_length) / sample_rate)
 
     return audio_new, gap_interval
+  
+ # --- STFT Processing ---
+
+def audio_to_stft(
+    audio_data: np.ndarray,
+    n_fft: int = 2048,
+    hop_length: int = 512,
+    win_length: Optional[int] = None,
+    window: str = 'hann',
+    center: bool = True,
+) -> np.ndarray:
+    """
+    Compute the Short-Time Fourier Transform (STFT) of an audio signal.
+    This returns the complex-valued STFT matrix, required for lossless inversion.
+
+    Args:
+        audio_data (np.ndarray): Audio time series.
+        n_fft (int, optional): Length of the FFT window. Defaults to 2048.
+        hop_length (int, optional): _description_. Defaults to 512.
+        win_length (Optional[int], optional): _description_. Defaults to None.
+        window (str, optional): _description_. Defaults to 'hann'.
+        center (bool, optional): _description_. Defaults to True.
+
+    Returns:
+        np.ndarray: _description_
+    """
+    # STUB: Finish later if time
+    raise NotImplementedError("audio_to_stft is not yet implemented.")
+
 
 def extract_spectrogram(
     audio_data: np.ndarray,
@@ -133,9 +248,7 @@ def extract_spectrogram(
         center=center
     )
     
-    return stft
-    # NOTE: There are no negative numnbers in the STFT, so we can use power = 1.0 for energy
-    #return np.abs(stft) ** power
+    return np.abs(stft) ** power
 
 
 def extract_mel_spectrogram(
@@ -181,63 +294,55 @@ def extract_mel_spectrogram(
         power=power
     )
 
-
 def spectrogram_to_audio(
     spectrogram: np.ndarray,
-    phase_info: bool = False,
-    hop_length: int = 192,
-    window: str = 'hann',
-    win_length: Optional[int] = 384,
-    n_fft: int = 512,
-    n_iter: int = 64,       # 32 (previous value) was too low
-    center: bool = True,
-    phase_initialization: Optional[np.ndarray] = None
-) -> np.ndarray:
+    phase: Optional[np.ndarray] = None,
+    n_fft=512,
+    n_iter=64,
+    window='hann',
+    hop_length=512,
+    win_length=None,
+    center=True) -> np.ndarray:
     """
-    Convert a magnitude spectrogram to audio using Griffin-Lim algorithm.
-
-    Parameters
-    ----------
-    spectrogram (np.ndarray): Magnitude spectrogram
-    hop_length (int, optional): Number of samples between successive frames
-    win_length (int or None, optional): Window length. If None, defaults to n_fft
-    n_fft (int, optional): FFT window size
-    n_iter (int, optional): Number of iterations for Griffin-Lim
-    window (str, optional): Window specification
-    center (bool, optional): If True, pad signal on both sides
-    phase_initialization (np.ndarray or None, optional): Initial phase for Griffin-Lim
+    Convert a spectrogram back to audio using either:
+    1. Original phase information (if provided)
+    2. Griffin-Lim algorithm to estimate phase (if no phase provided)
     
-    Returns
-    -------
-    np.ndarray
-        Audio time series
+    Even with original phase, the reconstruction is not truely lossless 1e-33 MSE loss.
+    
+    Parameters:
+    -----------
+    spectrogram (np.ndarray): The magnitude spectrogram to convert back to audio
+    phase       (np.ndarray, optional): Phase information to use for reconstruction. If None, Griffin-Lim is used.
+    n_fft       (int): FFT window size
+    n_iter      (int, optional): Number of iterations for Griffin-Lim algorithm
+    window      (str): Window function to use
+    win_length  (int or None): Window size. If None, defaults to n_fft 
+    hop_length  (int, optional): Number of samples between successive frames
+    center      (bool, optional): Whether to pad the signal at the edges
+         
+    Returns:
+    --------
+    y : np.ndarray The reconstructed audio signal
     """
-    # TODO: Consider switching to LWS (used in Audio-Visual paper)
-    # NOTE: Not possible to convert a magnitude spectrogram directly back to raw wav - phase and all voicing information is lost.
-    # NOTE: Griffin-Lim is not guaranteed to work well for all audio types. It is a heuristic method and may produce artifacts or distortions in some cases.
-    # NOTE: Griffin-Lim algorithm is used to recover the phase information and convert the magnitude spectrogram back to audio.
-
-    if phase_info:
-        return librosa.istft(
-            spectrogram,
-            hop_length=hop_length,
-            win_length=win_length,
-            window=window,
-            center=center
-        )
+    # If the input is in dB scale, convert back to amplitude
+    if np.max(spectrogram) < 0 and np.mean(spectrogram) < 0:
+        spectrogram = librosa.db_to_amplitude(spectrogram)
     
-    # Use Griffin-Lim algorithm to recover phase
-    return librosa.griffinlim(
-        spectrogram,
-        hop_length=hop_length,
-        win_length=win_length,
-        n_fft=n_fft,
-        n_iter=n_iter,
-        window=window,
-        center=center,
-        init=phase_initialization
-    )
-
+    # If phase information is provided, use it for reconstruction
+    if phase is not None:
+        # Combine magnitude and phase to form complex spectrogram
+        complex_spectrogram = spectrogram * np.exp(1j * phase)
+        
+        # Inverse STFT to get audio
+        y = librosa.istft(complex_spectrogram, n_fft=n_fft, hop_length=hop_length, 
+                          win_length=win_length, window=window, center=center)
+    else:
+        # Use Griffin-Lim algorithm to estimate phase
+        y = librosa.griffinlim(spectrogram, n_fft=n_fft, n_iter=n_iter, 
+                               hop_length=hop_length, win_length=win_length, 
+                               window=window, center=center)
+    return y
 
 def mel_spectrogram_to_audio(
     mel_spectrogram: np.ndarray,
@@ -299,43 +404,6 @@ def mel_spectrogram_to_audio(
     
     return audio_data
 
-
-def save_audio(
-    audio_data: np.ndarray,
-    file_path: Union[str, Path],
-    sample_rate: int = DEFAULT_SAMPLE_RATE,
-    file_format: str = 'flac'
-) -> None:
-    """
-    Save audio data to a file.
-
-    Parameters
-    ----------
-    audio_data   (np.ndarray): Audio time series
-    file_path    (str or Path): Path to save the audio file
-    sample_rate  (int, optional): Sample rate of audio
-    file_format  (str, optional): Audio file format
-    
-    Returns
-    -------
-    None
-    """
-    output_dir = os.path.dirname(file_path)
-    if output_dir and not os.path.exists(output_dir):
-        try:
-            os.makedirs(output_dir)
-        except Exception as e:
-            raise IOError(f"Error creating directory {output_dir}: {str(e)}")
-        
-    # Normalize audio before saving
-    audio_data = librosa.util.normalize(audio_data)
-    
-    try:
-        sf.write(file_path, audio_data, sample_rate, format=file_format)
-    except Exception as e:
-        raise IOError(f"Error saving audio to {file_path}: {str(e)}")
-
-
 def visualize_spectrogram(
     spectrogram: np.ndarray,
     power: int = 1,
@@ -371,7 +439,6 @@ def visualize_spectrogram(
     Figure or None
         The matplotlib Figure object if save_path is None, otherwise None
     """
-    # Adjust for STFT time shifts due to hop_len?? - NOTE: Gaps MIGHT be slightly off as a result
     if power not in (1, 2):
         raise ValueError("Power must be 1 (energy) or 2 (power)")
     
@@ -399,9 +466,10 @@ def visualize_spectrogram(
     # Compute gap start and end indices and plot vertical lines
     if gap_int is not None:
         gap_start_s, gap_end_s = gap_int
+
         ax.axvline(x=gap_start_s, color='white', linestyle='--', label='Gap Start')
         ax.axvline(x=gap_end_s, color='white', linestyle='--', label='Gap End')
-        #ax.legend()
+        ax.legend()
 
     # Add colorbar and title
     fig.colorbar(img, ax=ax, format='%+2.0f dB')
@@ -410,11 +478,11 @@ def visualize_spectrogram(
 
     # Save or return the figure
     if save_path is not None:
-        # Create directory if it doesn't exist
-        output_dir = os.path.dirname(save_path)
-        if output_dir and not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-            
+        save_path = Path(save_path)
+        output_dir = save_path.parent
+        if output_dir and not output_dir.exists():
+            output_dir.mkdir(parents=True, exist_ok=True)
+
         fig.savefig(save_path)
         plt.close(fig)
         return None

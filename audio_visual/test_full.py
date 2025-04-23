@@ -59,7 +59,7 @@ for batch_idx, (log_spectrogram_gaps, gap_ints_s, gap_masks, spectrogram_target_
 
     # Forward pass
     with torch.no_grad():
-        spectrogram_reconstructed = model.reconstruct_audio(log_spectrogram_gaps, gap_masks)
+        spectrogram_reconstructed = model.reconstruct_spectrogram(log_spectrogram_gaps, gap_masks)
         spectrogram_full2 = model(log_spectrogram_gaps.unsqueeze(1))
 
     # Compute L1 loss

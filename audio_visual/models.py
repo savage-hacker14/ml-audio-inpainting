@@ -89,7 +89,7 @@ class StackedBLSTMCNN(nn.Module):
 
         return x
     
-    def reconstruct_audio(self, log_spectrogram_gap, gap_mask):
+    def reconstruct_spectrogram(self, log_spectrogram_gap, gap_mask):
         if (not self.using_phase):
             reconstructed_full_spectrogram = self(log_spectrogram_gap.unsqueeze(1))             # Add channel dimension for CNN encoder input
         else:

@@ -155,7 +155,7 @@ for epoch in range(num_epochs):
     if (global_step % config['logging']['spectrogram_interval'] == 0):
         orig_spectogram_sample     = spectrogram_target_phases[0].detach().cpu().numpy()
         gap_spectrogram_sample     = (10 ** log_spectrogram_gaps[0]).detach().cpu().numpy()
-        reconst_spectrogram_sample = 10 ** model.reconstruct_audio(log_spectrogram_gaps, gap_masks)
+        reconst_spectrogram_sample = 10 ** model.reconstruct_spectrogram(log_spectrogram_gaps, gap_masks)
         reconst_spectrogram_sample = reconst_spectrogram_sample[0].detach().cpu().numpy()
         gap_start_s                = gap_ints_s[0, 0].item()
         gap_end_s                  = gap_ints_s[0, 1].item()
@@ -176,10 +176,12 @@ for epoch in range(num_epochs):
         if fig_gen:  writer.add_figure("Spectrograms/Generated", fig_gen, global_step)
         plt.close('all') # Close all generated figures
 
-        # Also save all audio files to tensorboard
-        orig_audio_sample    = utils.spectrogram_to_audio(orig_spectogram_sample, phase_info=True, n_fft=config['data']['spectrogram']['n_fft'])
-        gap_audio_sample     = utils.spectrogram_to_audio(gap_spectrogram_sample, phase_info=False, n_fft=config['data']['spectrogram']['n_fft'])
-        reconst_audio_sample = utils.spectrogram_to_audio(reconst_spectrogram_sample, phase_info=False, n_fft=config['data']['spectrogram']['n_fft'])
+    # Also save all audio files to tensorboard every `audio_interval` batches
+    if (global_step % config['logging']['audio_interval'] == 0):
+        gap_spectrogram_sample_phase = (spectrogram_target_phases[0] * (1 - gap_masks[0])).detach().cpu().numpy()
+        orig_audio_sample            = utils.spectrogram_to_audio(orig_spectogram_sample, phase_info=True, n_fft=config['data']['spectrogram']['n_fft'])
+        gap_audio_sample             = utils.spectrogram_to_audio(gap_spectrogram_sample_phase, phase_info=True, n_fft=config['data']['spectrogram']['n_fft'])
+        reconst_audio_sample         = utils.spectrogram_to_audio(reconst_spectrogram_sample, phase_info=False, n_fft=config['data']['spectrogram']['n_fft'])
         utils.save_audio(orig_audio_sample, Path(config['paths']['sample_dir']) / run_name / f"orig_audio_{global_step}.flac")
         utils.save_audio(gap_audio_sample, Path(config['paths']['sample_dir']) / run_name / f"gap_audio_{global_step}.flac")
         utils.save_audio(reconst_audio_sample, Path(config['paths']['sample_dir']) / run_name / f"reconstructed_audio_{global_step}.flac")

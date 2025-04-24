@@ -94,6 +94,7 @@ def create_gap_mask(
     audio_len_samples: int,
     gap_len_s: float,
     sample_rate: int = DEFAULT_SAMPLE_RATE,
+    gap_start_s: Optional[float] = None,
 ) -> Tuple[np.ndarray, Tuple[int, int]]:
     """
     Creates a binary mask with a single gap of zeros at a random location.
@@ -106,6 +107,8 @@ def create_gap_mask(
         Desired gap length in seconds.
     sample_rate : int, optional
         Sample rate. Defaults to DEFAULT_SAMPLE_RATE.
+    gap_start_s : float, optional
+        Timestap in seconds where the gap starts. If None, a random position is chosen.
 
     Returns
     -------
@@ -127,7 +130,11 @@ def create_gap_mask(
 
     # Choose a random start position for the gap (inclusive range)
     max_start_sample = audio_len_samples - gap_len_samples
-    gap_start_sample = np.random.randint(0, max_start_sample + 1)
+    if (gap_start_s is not None):
+        gap_start_sample = np.random.randint(0, max_start_sample + 1)
+    else:
+        gap_start_sample = gap_start_s * sample_rate
+
     gap_end_sample = gap_start_sample + gap_len_samples
 
     # Create mask

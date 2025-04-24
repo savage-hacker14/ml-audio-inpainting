@@ -15,6 +15,7 @@ import numpy as np
 from tqdm import tqdm
 
 import sys
+sys.path.append(str(Path(__file__).resolve().parent))
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
 
 from loss import VGGLoss

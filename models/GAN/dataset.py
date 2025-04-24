@@ -31,6 +31,7 @@ class SpeechInpaintingDataset(Dataset):
         self.max_len_s = self.data_cfg['max_len_s']
         self.gap_len_s = self.data_cfg['gap_len_s']
         self.max_samples = int(self.sample_rate * self.max_len_s)
+        self.spec_normalize = self.spec_cfg['normalize']
 
         # Determine dataset path
         if dataset_type == 'train':

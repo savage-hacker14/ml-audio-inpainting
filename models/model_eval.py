@@ -109,11 +109,14 @@ def inpaint(model, config_path, audio_path, output_path, device):
             spec_mask[:, gap_start_frame:gap_end_frame] = 0
 
         #original_magnitude_t = torch.from_numpy(original_magnitude).float()
-        impaired_magnitude_t = torch.from_numpy(impaired_magnitude).float()
-        mask_t = torch.from_numpy(spec_mask).float()
+        impaired_magnitude_t = torch.from_numpy(impaired_magnitude).float().to(device)
+        impaired_magnitude_t = impaired_magnitude_t.unsqueeze(0).unsqueeze(0)   # Ensure dim of (1, 1, freq_bins, timeframes)
+        mask_t = torch.from_numpy(spec_mask).float().to(device)
+        mask_t = mask_t.unsqueeze(0).unsqueeze(0)    # Ensure dim of (1, 1, freq_bins, timeframes)
         
         with torch.no_grad():
             inpainted = model(impaired_magnitude_t, mask_t)
+            inpainted = inpainted.squeeze(0).squeeze(0)  # Remove batch dimension
     elif (model_type == 'cnnlstm'):
         # Create spectrogram-size gap mask
         hop_length = config['data']['spectrogram']['hop_length']
@@ -183,18 +186,37 @@ def run_evaluation(input_dir, output_dir, model_type, checkpoint, config_path):
     # Process each file
     for filename in flac_files:
         input_path = input_dir + "/" + filename
-        output_filename = f"{os.path.splitext(filename)[0]}_inpainted.flac"
+        output_filename = f"{os.path.splitext(filename)[0]}_{model_type}_inpainted.flac"
         output_path = output_dir + "/" + output_filename
         
         inpaint(model, config_path, input_path, output_path, device) # Add mask params if needed
 
 if __name__ == "__main__":
-    # --- Configuration ---
-    CONFIG_PATH = "CNNBLSTM/cnn_blstm.yaml"
+    # # --- CNN LSTM Configuration ---
+    # CONFIG_PATH = "CNNBLSTM/cnn_blstm.yaml"
+    # INPUT_DIRECTORY = "../test_samples"  
+    # OUTPUT_DIRECTORY = "../test_samples_reconstructed"
+    # MODEL_TYPE = "cnnlstm"  # "gan" or "cnnlstm"
+    # CHECKPOINT_PATH = "CNNBLSTM/checkpoints/blstm_cnn_epoch_75.pt" 
+    # # FORCE_CPU = False # Set to True to force CPU usage
+    # # --- End Configuration ---
+
+    # # Basic validation for required paths
+    # run_evaluation(
+    #     input_dir=INPUT_DIRECTORY,
+    #     output_dir=OUTPUT_DIRECTORY,
+    #     model_type=MODEL_TYPE,
+    #     checkpoint=CHECKPOINT_PATH,
+    #     config_path=CONFIG_PATH,
+    #     # force_cpu=FORCE_CPU
+    # )
+
+    # --- CNN LSTM Configuration ---
+    CONFIG_PATH = "GAN/config.yaml"
     INPUT_DIRECTORY = "../test_samples"  
     OUTPUT_DIRECTORY = "../test_samples_reconstructed"
-    MODEL_TYPE = "cnnlstm"  # "gan" or "cnnlstm"
-    CHECKPOINT_PATH = "CNNBLSTM/checkpoints/blstm_cnn_epoch_75.pt" 
+    MODEL_TYPE = "gan"  # "gan" or "cnnlstm"
+    CHECKPOINT_PATH = "C:\\Users\\Jacob\\git\\model-gan\\model\\GAN\\checkpoints\\GAN-board_vgg_20250423_110015\\generator_epoch_0100.pth" 
     # FORCE_CPU = False # Set to True to force CPU usage
     # --- End Configuration ---
 

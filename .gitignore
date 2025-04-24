@@ -61,7 +61,17 @@ model/*/checkpoints/
 
 # Generated output directories
 output/
-model/*/output/
+models/*/output/
+models/AudioReg/results_*
+models/AudioReg/signals_*
+models/AudioReg/*.asv
+models/AudioReg/ltfat-2.6.0-win64
+models/AudioReg/PEAQ
+models/AudioReg/PEMO-Q_v1.4.1
+models/AudioReg/PQevalAudio-v1r0
+
+
+# Other unnecessary files for AutoRegressive model
 
 # Temporary files
 temp/

@@ -130,10 +130,10 @@ def create_gap_mask(
 
     # Choose a random start position for the gap (inclusive range)
     max_start_sample = audio_len_samples - gap_len_samples
-    if (gap_start_s is not None):
+    if (gap_start_s is None):
         gap_start_sample = np.random.randint(0, max_start_sample + 1)
     else:
-        gap_start_sample = gap_start_s * sample_rate
+        gap_start_sample = int(gap_start_s * sample_rate)
 
     gap_end_sample = gap_start_sample + gap_len_samples
 

@@ -57,7 +57,9 @@ for i=1:n_models
         solution    = y;
 
         % Compute SDR
-        model_compare_table.SDR(i) = snr(signal(~mask), signal(~mask)-solution(~mask));
+        model_compare_table.SDR(i) = snr(signal(~mask), abs(signal(~mask)-solution(~mask)));      % Ensure SDR is positive
+        figure; plot(signal(~mask)-solution(~mask));
+        title(strcat('Model ', num2str(i)));
 
         % Compute PEMOQ
         model_compare_table.PEMOQ(i) = audioqual(signal, solution, fs);

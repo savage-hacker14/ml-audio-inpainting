@@ -78,6 +78,8 @@ def inpaint(model, config_path, audio_path, output_path, device):
         hop_length=config['data']['spectrogram']['hop_length'], 
         win_length=config['data']['spectrogram']['win_length']
     )
+
+    print(f"Spectogram size: {original_spectrogram.shape}")
     
     original_magnitude = np.abs(original_spectrogram)
     original_magnitude = np.log1p(original_magnitude)
@@ -117,6 +119,28 @@ def inpaint(model, config_path, audio_path, output_path, device):
         with torch.no_grad():
             inpainted = model(impaired_magnitude_t, mask_t)
             inpainted = inpainted.squeeze(0).squeeze(0)  # Remove batch dimension
+
+        if (audio_path  == "../test_samples/81-121543-0008.flac"):
+            utils.visualize_spectrogram(np.expm1(original_magnitude), in_db=False, power=1, title="Original Spectrogram")
+            utils.visualize_spectrogram(impaired_magnitude, in_db=False, power=1, title="Gap Spectrogram")
+            utils.visualize_spectrogram(inpainted.cpu().numpy(), in_db=False, power=1, title="Inpainted Spectrogram")
+            import matplotlib.pyplot as plt
+            plt.show()
+
+        utils.save_audio(
+            utils.spectrogram_to_audio(
+                inpainted.cpu().numpy(), 
+                # phase=original_phase_t.cpu().numpy(), 
+                # phase_info=True, 
+                phase=original_phase,
+                phase_info=False, 
+                n_fft=config['data']['spectrogram']['n_fft'], 
+                hop_length=config['data']['spectrogram']['hop_length'], 
+                win_length=config['data']['spectrogram']['win_length']
+            ),
+            file_path=output_path,
+            sample_rate=sr
+        )
     elif (model_type == 'cnnlstm'):
         # Create spectrogram-size gap mask
         hop_length = config['data']['spectrogram']['hop_length']
@@ -132,33 +156,44 @@ def inpaint(model, config_path, audio_path, output_path, device):
         # utils.visualize_spectrogram(10 ** log_impaired_magnitude, in_db=False, power=1, title="Gap Spectrogram")
 
         log_impaired_magnitude = torch.from_numpy(log_impaired_magnitude).unsqueeze(0).float()
-        log_impaired_magnitude = log_impaired_magnitude.to(device)
+        log_impaired_magnitude_t = log_impaired_magnitude.to(device)
         
 
         with torch.no_grad():
-            inpainted = 10 ** model.reconstruct_spectrogram(log_impaired_magnitude, mask_t)     # Make sure to undo log10 transform
+            inpainted = 10 ** model.reconstruct_spectrogram(log_impaired_magnitude_t, mask_t)     # Make sure to undo log10 transform
             inpainted = inpainted.squeeze(0)  # Remove batch dimension
             # utils.visualize_spectrogram(abs(original_spectrogram), in_db=False, power=1, title="Original Spectrogram")
 
             # utils.visualize_spectrogram(inpainted.cpu().numpy(), in_db=False, power=1, title="Inpainted Spectrogram")
             # import matplotlib.pyplot as plt
             # plt.show()
+        
+        if (audio_path  == "../test_samples/81-121543-0008.flac"):
+            utils.visualize_spectrogram(abs(original_spectrogram), in_db=False, power=1, title="Original Spectrogram")
+            utils.visualize_spectrogram(10 ** log_impaired_magnitude[0], in_db=False, power=1, title="Gap Spectrogram")
+            utils.visualize_spectrogram(inpainted.cpu().numpy(), in_db=False, power=1, title="Inpainted Spectrogram")
+            import matplotlib.pyplot as plt
+            plt.show()
+
+        # Save the inpainted audio
+        utils.save_audio(
+            utils.spectrogram_to_audio(
+                inpainted.cpu().numpy(), 
+                # phase=None,
+                # phase_info=False, 
+                phase=original_phase,
+                phase_info=False, 
+                n_fft=config['data']['spectrogram']['n_fft'], 
+                hop_length=config['data']['spectrogram']['hop_length'], 
+                win_length=config['data']['spectrogram']['win_length']
+            ),
+            file_path=output_path,
+            sample_rate=sr
+        )
     else:
         raise ValueError("Unknown model type.")
 
-    # Save the inpainted audio
-    utils.save_audio(
-        utils.spectrogram_to_audio(
-            inpainted.cpu().numpy(), 
-            phase=None, #original_phase_t.cpu().numpy(), 
-            phase_info=False, 
-            n_fft=config['data']['spectrogram']['n_fft'], 
-            hop_length=config['data']['spectrogram']['hop_length'], 
-            win_length=config['data']['spectrogram']['win_length']
-        ),
-        file_path=output_path,
-        sample_rate=sr
-    )
+
 
 def run_evaluation(input_dir, output_dir, model_type, checkpoint, config_path):
     """Main function to orchestrate the evaluation."""
@@ -192,33 +227,24 @@ def run_evaluation(input_dir, output_dir, model_type, checkpoint, config_path):
         inpaint(model, config_path, input_path, output_path, device) # Add mask params if needed
 
 if __name__ == "__main__":
-    # # --- CNN LSTM Configuration ---
-    # CONFIG_PATH = "CNNBLSTM/cnn_blstm.yaml"
-    # INPUT_DIRECTORY = "../test_samples"  
-    # OUTPUT_DIRECTORY = "../test_samples_reconstructed"
-    # MODEL_TYPE = "cnnlstm"  # "gan" or "cnnlstm"
-    # CHECKPOINT_PATH = "CNNBLSTM/checkpoints/blstm_cnn_epoch_75.pt" 
-    # # FORCE_CPU = False # Set to True to force CPU usage
-    # # --- End Configuration ---
-
-    # # Basic validation for required paths
-    # run_evaluation(
-    #     input_dir=INPUT_DIRECTORY,
-    #     output_dir=OUTPUT_DIRECTORY,
-    #     model_type=MODEL_TYPE,
-    #     checkpoint=CHECKPOINT_PATH,
-    #     config_path=CONFIG_PATH,
-    #     # force_cpu=FORCE_CPU
-    # )
-
     # --- CNN LSTM Configuration ---
-    CONFIG_PATH = "GAN/config.yaml"
+    CONFIG_PATH = "CNNBLSTM/cnn_blstm.yaml"
     INPUT_DIRECTORY = "../test_samples"  
     OUTPUT_DIRECTORY = "../test_samples_reconstructed"
-    MODEL_TYPE = "gan"  # "gan" or "cnnlstm"
-    CHECKPOINT_PATH = "C:\\Users\\Jacob\\git\\model-gan\\model\\GAN\\checkpoints\\GAN-board_vgg_20250423_110015\\generator_epoch_0100.pth" 
+    MODEL_TYPE = "cnnlstm"  # "gan" or "cnnlstm"
+    CHECKPOINT_PATH = "CNNBLSTM/checkpoints/blstm_cnn_epoch_75.pt" 
     # FORCE_CPU = False # Set to True to force CPU usage
     # --- End Configuration ---
+
+    # # --- GAN Configuration ---
+    # CONFIG_PATH = "GAN/config.yaml"
+    # INPUT_DIRECTORY = "../test_samples"  
+    # OUTPUT_DIRECTORY = "../test_samples_reconstructed"
+    # MODEL_TYPE = "gan"  # "gan" or "cnnlstm"
+    # #CHECKPOINT_PATH = "C:\\Users\\Jacob\\git\\model-gan\\model\\GAN\\checkpoints\\GAN-board_vgg_20250423_110015\\generator_epoch_0100.pth" 
+    # CHECKPOINT_PATH = "C:\\Users\\Jacob\\git\\model-gan\\model\\GAN\\checkpoints\\GAN-board_vgg_20250416_233830\\generator_epoch_0100.pth" 
+    # # FORCE_CPU = False # Set to True to force CPU usage
+    # # --- End Configuration ---
 
     # Basic validation for required paths
     run_evaluation(
